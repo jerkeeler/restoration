@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "restoration"
-version = "0.1.0"
+version = "0.2.1"
 description = "A parser for Age of Mythology .mythrec files"
 authors = [{name = "Jeremy Keeler", email = "jeremy@keeler.dev"}]
 license = {file = "LICENSE"}
@@ -15,6 +15,12 @@ classifiers = [
 ]
 dependencies = ["click>=8.0.0"]
 readme = "README.md"
+
+[project.urls]
+repository = "https://github.com/jerkeeler/restoration"
+homepage = "https://github.com/jerkeeler/restoration"
+issues = "https://github.com/jerkeeler/restoration/issues"
+changelog = "https://github.com/jerkeeler/restoration/blob/master/CHANGELOG.md"
 
 [project.scripts]
 restoration = "restoration.cli:cli"
@@ -30,3 +36,6 @@ dev = [
 
 [tool.isort]
 profile = "black"
+
+[tool.black]
+line-length = 120
