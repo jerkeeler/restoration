@@ -4,22 +4,61 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 )
 
 var FOOTER = []uint8{0, 1, 0, 0, 0, 0, 0, 0}
 
-type CommandItem struct {
+// =========================================================================
+// The first part of this file contains the command type definitions and
+// defines how they can be read and interpreted from the raw bytes.
+// =========================================================================
+
+type GameCommand interface {
+	CommandType() int
+	OffsetEnd() int
+	PlayerId() int
+	ByteLength() int
+}
+
+type BaseCommand struct {
 	commandType int
+	playerId    int
 	offsetEnd   int
+	byteLength  int
+}
+
+func (cmd BaseCommand) CommandType() int {
+	return cmd.commandType
+}
+
+func (cmd BaseCommand) OffsetEnd() int {
+	return cmd.offsetEnd
+}
+
+func (cmd BaseCommand) PlayerId() int {
+	return cmd.playerId
+}
+
+func (cmd BaseCommand) ByteLength() int {
+	return cmd.byteLength
+}
+
+type ResearchCommand struct {
+	BaseCommand
+	techId int32
 }
 
 type CommandList struct {
 	entryIdx     int
 	offsetEnd    int
 	finalCommand bool
-	commands     []CommandItem
+	commands     []GameCommand
 }
 
+// TODO: Implement actual refiners. Right now all of these functions purely return how many
+// bytes are consumed for a given command type, this is a good litmus test to make sure
+// we can read the whole file. Next step is to to actually convert these into useable objects.
 func unpackInt32() int {
 	return 4
 }
@@ -36,88 +75,562 @@ func unpackFloat() int {
 	return 4
 }
 
-var REFINERS = map[int][]func() int{
-	0: {
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackVector,
-		unpackFloat,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
+var REFINERS = map[int]func(*[]byte, int, int) GameCommand{
+	// task
+	0: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackVector,
+			unpackFloat,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+		}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 0,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
 	},
-	1: {unpackInt32, unpackInt32, unpackInt32},
-	2: {unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt8, unpackInt8},
-	3: {
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackVector,
-		unpackInt32,
-		unpackInt32,
-		unpackFloat,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
+
+	// research
+	1: func(data *[]byte, offset int, playerId int) GameCommand {
+		// The research command is 12 bytes in length, the last 4 bytes are an int32 representing the id of the tech
+		// that was researched.
+		// inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 12
+		techId := readInt32(data, offset+8)
+		return ResearchCommand{
+			BaseCommand: BaseCommand{
+				commandType: 1,
+				playerId:    playerId,
+				byteLength:  byteLength,
+				offsetEnd:   offset + byteLength,
+			},
+			techId: techId,
+		}
 	},
-	4: {unpackInt32, unpackInt32, unpackVector, unpackFloat, unpackInt32, unpackInt32},
-	7: {unpackInt32, unpackInt32, unpackInt8},
-	9: {unpackInt32, unpackInt32},
-	12: {
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackVector,
-		unpackVector,
-		unpackInt32,
-		unpackInt32,
-		unpackFloat,
-		unpackInt32,
-		unpackInt32,
-		unpackInt8,
+
+	// train
+	2: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt8,
+			unpackInt8,
+		}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 2,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
 	},
-	13: {unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackFloat},
-	14: {unpackInt32, unpackInt32},
-	16: {unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt8},
-	18: {unpackInt32, unpackInt32, unpackInt32},
-	19: {unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackFloat, unpackFloat, unpackInt8},
-	23: {unpackInt32, unpackInt32, unpackInt32, unpackInt8, unpackInt8},
-	25: {unpackInt32, unpackInt32, unpackInt8, unpackInt8, unpackInt32},
-	26: {unpackInt32, unpackInt32, unpackInt8, unpackInt32},
-	34: {unpackInt32, unpackInt32},
-	35: {unpackInt32, unpackInt32, unpackInt32},
-	37: {unpackInt32, unpackInt32, unpackInt8, unpackInt32},
-	38: {unpackInt32, unpackInt32, unpackInt32},
-	41: {
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt32,
-		unpackInt8,
+
+	// build
+	3: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackVector,
+			unpackInt32,
+			unpackInt32,
+			unpackFloat,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+		}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 3,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
 	},
-	44: {unpackInt32, unpackInt32, unpackInt32, unpackInt32},
-	45: {unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32},
-	48: {unpackInt32, unpackInt32, unpackInt32, unpackInt32},
-	53: {unpackInt32, unpackInt32, unpackInt32},
-	55: {unpackInt32, unpackInt32, unpackVector},
-	66: {unpackInt32, unpackInt32, unpackInt32},
-	67: {unpackInt32, unpackInt32, unpackInt8},
-	68: {unpackInt32, unpackInt32, unpackVector, unpackVector},
-	69: {unpackInt32, unpackInt32, unpackInt32, unpackVector, unpackVector},
-	71: {unpackInt32, unpackInt32},
-	72: {unpackInt32, unpackInt32, unpackInt32, unpackInt8},
-	75: {unpackInt32, unpackInt32, unpackInt32, unpackInt32},
+
+	4: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackVector, unpackFloat, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 4,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// delete
+	7: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt8}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 7,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// stop
+	9: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 9,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// useProtoPower
+	12: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackVector,
+			unpackVector,
+			unpackInt32,
+			unpackInt32,
+			unpackFloat,
+			unpackInt32,
+			unpackInt32,
+			unpackInt8,
+		}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 12,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// marketBuySellResources
+	13: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackFloat}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 13,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// ungarrison
+	14: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 14,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// resign
+	16: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt8}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 16,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// unknown 18
+	18: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 18,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// tribute
+	19: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackFloat, unpackFloat, unpackInt8}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 19,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// finishUnitTransform
+	23: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt8, unpackInt8}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 23,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// setUnitStance
+	25: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt8, unpackInt8, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 25,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// changeDiplomacy
+	26: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt8, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 26,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// townBell
+	34: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 34,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// autoScoutEvent
+	35: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 35,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// changeControlGroupContents
+	37: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt8, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 37,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// repair
+	38: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 38,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// taunt
+	41: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt32,
+			unpackInt8,
+		}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 41,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// cheat
+	44: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 44,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// cancelQueuedItem
+	45: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 45,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// setFormation
+	48: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 48,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// startUnitTransform
+	53: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 53,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// unknown 55
+	55: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackVector}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 55,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// autoqueue
+	66: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 66,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// toggleAutoUnitAbility
+	67: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt8}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 67,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// timeshift
+	68: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackVector, unpackVector}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 68,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// buildWallConnector
+	69: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackVector, unpackVector}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 69,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// seekShelter
+	71: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 71,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// prequeueTech
+	72: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt8}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 72,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
+
+	// prebuyGodPower
+	75: func(data *[]byte, offset int, playerId int) GameCommand {
+		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+		byteLength := 0
+		for _, f := range inputTypes {
+			byteLength += f()
+		}
+		return BaseCommand{
+			commandType: 75,
+			playerId:    playerId,
+			byteLength:  byteLength,
+			offsetEnd:   offset + byteLength,
+		}
+	},
 }
+
+// =========================================================================
+// Below is the actual code to parse the command bytes into command types
+// that can be used.
+// =========================================================================
 
 type FooterNotFoundError int
 
@@ -133,6 +646,7 @@ func (err UnkNotEqualTo1Error) Error() string {
 
 func ParseCommandList(data *[]byte, headerEndOffset int) ([]CommandList, error) {
 	offset := bytes.Index((*data)[headerEndOffset:], FOOTER)
+	slog.Debug("Parsing command list", "offset", headerEndOffset+offset)
 
 	if offset == -1 {
 		return nil, FooterNotFoundError(offset)
@@ -161,7 +675,7 @@ func ParseCommandList(data *[]byte, headerEndOffset int) ([]CommandList, error) 
 		}
 		lastIndex += 1
 		if item.entryIdx != lastIndex {
-			return commandList, errors.New("entryIdx was not sequential!")
+			return commandList, fmt.Errorf("entryIdx was not sequential, item.entryIdx=%v, lastIndex=%v", item.entryIdx, lastIndex)
 		}
 		offset = item.offsetEnd
 	}
@@ -170,6 +684,11 @@ func ParseCommandList(data *[]byte, headerEndOffset int) ([]CommandList, error) 
 }
 
 func findFooterOffset(data *[]byte, offset int) (int, error) {
+	/*
+		Each set of commands is followd by a "FOOTER" (footer is probably not the correct term) the demarcates the
+		end of the command sequence and the beginning of the next. This function finds end of this footer and the
+		beginning of the next command.
+	*/
 	derefedData := *data
 	// early := derefedData[offset:offset+10]
 	extraByteCount := derefedData[offset]
@@ -179,7 +698,7 @@ func findFooterOffset(data *[]byte, offset int) (int, error) {
 		extraByteNumbers[i] = derefedData[offset+i]
 	}
 	if extraByteCount > 0 {
-		fmt.Printf("foot has %v extra bytes: %v\n", extraByteCount, extraByteNumbers)
+		slog.Debug(fmt.Sprintf("foot has %v extra bytes: %v", extraByteCount, extraByteNumbers))
 	}
 
 	unk := derefedData[offset]
@@ -197,7 +716,7 @@ func findFooterOffset(data *[]byte, offset int) (int, error) {
 
 func parseCommandList(data *[]byte, offset int) (CommandList, error) {
 	/*
-	   Parses a command item, which is actually a list of commands. The first int is a bit mask. Valid values:
+	   Parses a command list. The first int is a bit mask. Valid values:
 	   1
 	   32
 	   64
@@ -205,13 +724,13 @@ func parseCommandList(data *[]byte, offset int) (CommandList, error) {
 	*/
 	derefedData := *data
 	entryType := readUint32(data, offset)
-	// fmt.Printf("Parsing command list at offset=%v entryType=%v\n", offset, entryType)
+	// slog.Debug(fmt.Sprintf("Parsing command list at offset=%v entryType=%v", offset, entryType))
 	offset += 4
 	// earlyByte = data[offset]
 	offset += 1
 
 	if entryType&225 != entryType {
-		return CommandList{}, errors.New(fmt.Sprintf("Bad entry type, masking to 224 doesn't work for %v", entryType))
+		return CommandList{}, fmt.Errorf("bad entry type, masking to 224 doesn't work for %v", entryType)
 	}
 	if entryType&96 == 96 {
 		return CommandList{}, errors.New("96 entryType does't make sense")
@@ -223,7 +742,7 @@ func parseCommandList(data *[]byte, offset int) (CommandList, error) {
 		offset += 1
 	}
 
-	commands := make([]CommandItem, 0)
+	commands := make([]GameCommand, 0)
 
 	if entryType&96 != 0 {
 		numItems := 0
@@ -241,24 +760,35 @@ func parseCommandList(data *[]byte, offset int) (CommandList, error) {
 				return CommandList{}, err
 			}
 			commands = append(commands, command)
-			offset = command.offsetEnd
+			offset = command.OffsetEnd()
 		}
 	}
 
-	selectedUints := make([]uint32, 0)
+	for _, cmd := range commands {
+		if _, ok := cmd.(ResearchCommand); ok {
+			// It's a ResearchCommand
+			// slog.Debug("TechId", "techId", researchCmd.techId, "playerId", researchCmd.playerId)
+		}
+	}
+
+	// TODO: Do something with selectedUints
+	// selectedUints := make([]uint32, 0)
 	if entryType&128 != 0 {
 		numItems := int(derefedData[offset])
 		offset += 1
 		for i := 0; i < numItems; i++ {
-			selectedUints = append(selectedUints, readUint32(data, offset))
+			// selectedUints = append(selectedUints, readUint32(data, offset))
 			offset += 4
 		}
 	}
 
-	// Check if the last command is the resign command
+	// TODO: Remove this and modify this to work for more than 1v1 replays.
+	// Check if the last command is the resign command. Right now, the code panics because it cannot find a footer
+	// after the resign command is issued. I haven't tried running this on team games yet, but I imagine that
+	// it might work correctly. We'll need a smarter way to determine the end of the command stream.
 	for _, cmd := range commands {
-		if cmd.commandType == 16 {
-			// Resign command issued
+		if cmd.CommandType() == 16 {
+			// Resign command issued, return the command list
 			return CommandList{
 				-1,
 				offset,
@@ -273,11 +803,13 @@ func parseCommandList(data *[]byte, offset int) (CommandList, error) {
 		return CommandList{}, err
 	}
 	offset = footerEndOffset
+	// Right after the footer is the "entry index" which is basically the index of this command sequence.
+	// All CommandList commands should be ascending sequence order.
 	entryIdx := readUint32(data, offset)
 	offset += 4
 	finalByte := derefedData[offset]
 	if finalByte != 0 {
-		return CommandList{}, errors.New("Final byte doesn't equal 0!")
+		return CommandList{}, fmt.Errorf("final byte doesn't equal 0, finalByte=%v", finalByte)
 	}
 	offset += 1
 
@@ -289,10 +821,15 @@ func parseCommandList(data *[]byte, offset int) (CommandList, error) {
 	}, nil
 }
 
-func parseGameCommand(data *[]byte, offset int) (CommandItem, error) {
+func parseGameCommand(data *[]byte, offset int) (GameCommand, error) {
+	/*
+		Parses a direct game command and does some sanity checking of bytes. This commnad goes through
+		a refiner defined in the REFINERS variable. If a refiner doesn't exists for the command type then
+		this function will fail.
+	*/
 	derefedData := *data
 	commandType := int(derefedData[offset+1])
-	// fmt.Printf("Parsing game command with type=%v at offset=%v\n", commandType, offset)
+	// slog.Debug(fmt.Sprintf("Parsing game command with type=%v at offset=%v", commandType, offset))
 	tenBytesOffset := offset
 	offset += 10
 	if commandType == 14 {
@@ -303,7 +840,7 @@ func parseGameCommand(data *[]byte, offset int) (CommandItem, error) {
 
 	three := readUint32(data, offset)
 	if three != uint32(3) {
-		return CommandItem{}, errors.New("Expecting three while parsing game command")
+		return BaseCommand{}, fmt.Errorf("expecting three while parsing game command, three=%v", three)
 	}
 	offset += 4
 	playerId := -1
@@ -313,21 +850,23 @@ func parseGameCommand(data *[]byte, offset int) (CommandItem, error) {
 	} else {
 		one := readUint16(data, offset)
 		if one != uint16(1) {
-			return CommandItem{}, errors.New("Expecting one while parsing game command")
+			return BaseCommand{}, fmt.Errorf("expecting one while parsing game command, one=%v", one)
 		}
 		offset += 4
 		playerId = int(readUint16(data, offset))
 		if playerId > 12 {
-			return CommandItem{}, errors.New("Player id must be 12 or less")
+			return BaseCommand{}, fmt.Errorf("player id must be 12 or less, playerId=%v", playerId)
 		}
 		offset += 4
 	}
 	offset += 4
 	numUnits := readUint16(data, offset)
 	offset += 4
-	sourceUnits := make([]uint16, numUnits)
+
+	// TODO: Use sourceUnits for something?
+	// sourceUnits := make([]uint16, numUnits)
 	for i := 0; i < int(numUnits); i++ {
-		sourceUnits = append(sourceUnits, readUint16(data, offset))
+		// sourceUnits = append(sourceUnits, readUint16(data, offset))
 		offset += 4
 	}
 
@@ -347,13 +886,12 @@ func parseGameCommand(data *[]byte, offset int) (CommandItem, error) {
 
 	refiner, exists := REFINERS[int(commandType)]
 	if !exists {
-		return CommandItem{}, errors.New(fmt.Sprintf("Refiner not defined for commandType=%v", commandType))
+		return BaseCommand{}, fmt.Errorf("refiner not defined for commandType=%v", commandType)
 	}
 
-	for _, f := range refiner {
-		offset += f()
-	}
+	gameCommand := refiner(data, offset, playerId)
+	offset += gameCommand.ByteLength()
 
-	fmt.Printf("Parsing game command with type=%v for player playerId=%v\n", commandType, playerId)
-	return CommandItem{commandType, offset}, nil
+	// slog.Debug(fmt.Sprintf("Parsing game command with type=%v for player playerId=%v", commandType, playerId))
+	return gameCommand, nil
 }

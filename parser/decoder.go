@@ -68,6 +68,10 @@ func (err NotL33t) Error() string {
 }
 
 func Decompressl33t(compressed_array *[]byte) ([]byte, error) {
+	/*
+		Decompresses a l33t compressed byte stream. The header must l33t, then the following bytes are decompressed
+		using the zlib compression.
+	*/
 	header := string((*compressed_array)[:4])
 	if header != "l33t" {
 		return nil, NotL33t(fmt.Sprintf("Data is no l33t compressed, incorrect header: \"%s\"", header))

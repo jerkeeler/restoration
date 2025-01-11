@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Build
+        run: |
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -trimpath -o myrecparser-windows-amd64.exe
+
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -trimpath -o myrecparser-linux-amd64
+
+          # MacOS Intel
+          GOOS=darwin GOARCH=amd64 go build -trimpath -o myrecparser-darwin-amd64
+
+          # MacOS ARM
+          GOOS=darwin GOARCH=arm64 go build -trimpath -o myrecparser-darwin-arm64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            myrecparser-windows-amd64.exe
+            myrecparser-linux-amd64
+            myrecparser-darwin-amd64
+            myrecparser-darwin-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

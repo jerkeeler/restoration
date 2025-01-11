@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 )
 
@@ -18,12 +19,16 @@ func Parse(replayPath string) error {
 	}
 
 	rootNode := ParseHeader(&data)
-
 	buildString, err := readBuildString(&data, rootNode)
 	if err != nil {
 		return err
 	}
-	fmt.Println(buildString)
+	slog.Debug(buildString)
+
+	err = parseXmb(&data, rootNode)
+	if err != nil {
+		return err
+	}
 
 	_, err = parseProfileKeys(&data, rootNode)
 	if err != nil {
@@ -31,7 +36,6 @@ func Parse(replayPath string) error {
 	}
 	// printProfileKeys(profileKeys)
 
-	fmt.Println(77777, len(data))
 	_, err = ParseCommandList(&data, rootNode.endOffset())
 	if err != nil {
 		return err
@@ -131,6 +135,7 @@ func parseString(data *[]byte, position int, keyname string) ProfileKey {
 }
 
 func parseProfileKeys(data *[]byte, node Node) (map[string]ProfileKey, error) {
+	slog.Debug("Parsing profile keys from MP/ST node")
 	if !isRootNode(node) {
 		return nil, NotRootNodeError(node)
 	}
@@ -166,20 +171,20 @@ func parseProfileKeys(data *[]byte, node Node) (map[string]ProfileKey, error) {
 		position = profileKey.EndOffset
 	}
 	return profileKeys, nil
-
 }
 
 func printProfileKeys(profileKeys map[string]ProfileKey) {
 	for keyname, profileKey := range profileKeys {
-		fmt.Printf("keyname=%v", keyname)
+		log := ""
+		log += fmt.Sprintf("keyname=%v", keyname)
 		switch profileKey.Type {
 		case "string":
-			fmt.Printf("value=%v", profileKey.StringVal)
+			log += fmt.Sprintf("value=%v", profileKey.StringVal)
 		case "int32":
-			fmt.Printf("value=%v", profileKey.Int32Val)
+			log += fmt.Sprintf("value=%v", profileKey.Int32Val)
 		case "bool":
-			fmt.Printf("value=%v", profileKey.BoolVal)
+			log += fmt.Sprintf("value=%v", profileKey.BoolVal)
 		}
-		fmt.Printf("\n")
+		slog.Debug(log)
 	}
 }

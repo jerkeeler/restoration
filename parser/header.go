@@ -1,6 +1,9 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+	"log/slog"
+)
 
 const OUTER_HIERARCHY_START_OFFSET = 257
 const MAX_SCAN_OFFSET = 50
@@ -46,6 +49,7 @@ type Node struct {
 
 func ParseHeader(data *[]byte) Node {
 	rootNode := newNode(data, OUTER_HIERARCHY_START_OFFSET)
+	slog.Debug("Parsing header tree")
 	createTree(data, &rootNode)
 	// printTree(rootNode)
 	return rootNode
@@ -99,7 +103,7 @@ func printTree(node Node) {
 	/*
 	   Prints the tree structure of the node and its children. Useful for debugging.
 	*/
-	fmt.Println(node)
+	slog.Debug(node.String())
 	for _, child := range node.children {
 		printTree(*child)
 	}
