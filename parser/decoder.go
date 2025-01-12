@@ -9,11 +9,6 @@ import (
 	"unicode/utf16"
 )
 
-type String struct {
-	value     string
-	endOffset int
-}
-
 func readUint16(data *[]byte, offset int) uint16 {
 	return binary.LittleEndian.Uint16((*data)[offset : offset+2])
 }
@@ -34,7 +29,7 @@ func readBool(data *[]byte, offset int) bool {
 	return (*data)[offset] != 0
 }
 
-func readString(data *[]byte, offset int) String {
+func readString(data *[]byte, offset int) RecString {
 	/*
 	   Reads the utf-16 little endian encoded at the given offset. Strings are enocde such that the first 2 bytes
 	   are an unsigned integer indicating the number of characters in the string. The next 2 bytes are null padding.
@@ -54,17 +49,11 @@ func readString(data *[]byte, offset int) String {
 		u16s[i] = readUint16(data, startOfString+int(i)*2)
 	}
 
-	return String{
+	return RecString{
 		// Converts the UTF-16 encoded string into the native utf-8 encoded string by Go, might need to change this
 		string(utf16.Decode(u16s)),
 		endOfString,
 	}
-}
-
-type NotL33t string
-
-func (err NotL33t) Error() string {
-	return string(err)
 }
 
 func Decompressl33t(compressed_array *[]byte) ([]byte, error) {

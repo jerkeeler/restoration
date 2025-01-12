@@ -7,54 +7,10 @@ import (
 	"log/slog"
 )
 
-var FOOTER = []uint8{0, 1, 0, 0, 0, 0, 0, 0}
-
 // =========================================================================
 // The first part of this file contains the command type definitions and
 // defines how they can be read and interpreted from the raw bytes.
 // =========================================================================
-
-type GameCommand interface {
-	CommandType() int
-	OffsetEnd() int
-	PlayerId() int
-	ByteLength() int
-}
-
-type BaseCommand struct {
-	commandType int
-	playerId    int
-	offsetEnd   int
-	byteLength  int
-}
-
-func (cmd BaseCommand) CommandType() int {
-	return cmd.commandType
-}
-
-func (cmd BaseCommand) OffsetEnd() int {
-	return cmd.offsetEnd
-}
-
-func (cmd BaseCommand) PlayerId() int {
-	return cmd.playerId
-}
-
-func (cmd BaseCommand) ByteLength() int {
-	return cmd.byteLength
-}
-
-type ResearchCommand struct {
-	BaseCommand
-	techId int32
-}
-
-type CommandList struct {
-	entryIdx     int
-	offsetEnd    int
-	finalCommand bool
-	commands     []GameCommand
-}
 
 // TODO: Implement actual refiners. Right now all of these functions purely return how many
 // bytes are consumed for a given command type, this is a good litmus test to make sure
@@ -104,7 +60,7 @@ var REFINERS = map[int]func(*[]byte, int, int) GameCommand{
 	// research
 	1: func(data *[]byte, offset int, playerId int) GameCommand {
 		// The research command is 12 bytes in length, the last 4 bytes are an int32 representing the id of the tech
-		// that was researched.
+		// that was researched. The id maps to a string via the techtree XMB data stored in the header of the replay.
 		// inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
 		byteLength := 12
 		techId := readInt32(data, offset+8)
@@ -598,16 +554,20 @@ var REFINERS = map[int]func(*[]byte, int, int) GameCommand{
 
 	// prequeueTech
 	72: func(data *[]byte, offset int, playerId int) GameCommand {
-		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt8}
-		byteLength := 0
-		for _, f := range inputTypes {
-			byteLength += f()
-		}
-		return BaseCommand{
-			commandType: 72,
-			playerId:    playerId,
-			byteLength:  byteLength,
-			offsetEnd:   offset + byteLength,
+		// The prequeTech command is 13 bytes in length, bytes 8-12 are an int32 representing the id of the tech
+		// that was prequeued. The id maps to a string via the techtree XMB data stored in the header of the replay.
+		// inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt8}
+
+		byteLength := 13
+		techId := readInt32(data, offset+8)
+		return PrequeueTechCommand{
+			BaseCommand: BaseCommand{
+				commandType: 1,
+				playerId:    playerId,
+				byteLength:  byteLength,
+				offsetEnd:   offset + byteLength,
+			},
+			techId: techId,
 		}
 	},
 
@@ -631,18 +591,6 @@ var REFINERS = map[int]func(*[]byte, int, int) GameCommand{
 // Below is the actual code to parse the command bytes into command types
 // that can be used.
 // =========================================================================
-
-type FooterNotFoundError int
-
-func (err FooterNotFoundError) Error() string {
-	return fmt.Sprintf("Footer not found searching at offset=%v", int(err))
-}
-
-type UnkNotEqualTo1Error int
-
-func (err UnkNotEqualTo1Error) Error() string {
-	return fmt.Sprintf("The unknown byte in footer search did not equal 1 at offset %v", int(err))
-}
 
 func ParseCommandList(data *[]byte, headerEndOffset int) ([]CommandList, error) {
 	offset := bytes.Index((*data)[headerEndOffset:], FOOTER)
@@ -764,13 +712,6 @@ func parseCommandList(data *[]byte, offset int) (CommandList, error) {
 		}
 	}
 
-	for _, cmd := range commands {
-		if _, ok := cmd.(ResearchCommand); ok {
-			// It's a ResearchCommand
-			// slog.Debug("TechId", "techId", researchCmd.techId, "playerId", researchCmd.playerId)
-		}
-	}
-
 	// TODO: Do something with selectedUints
 	// selectedUints := make([]uint32, 0)
 	if entryType&128 != 0 {
@@ -839,10 +780,11 @@ func parseGameCommand(data *[]byte, offset int) (GameCommand, error) {
 	}
 
 	three := readUint32(data, offset)
+	offset += 4
 	if three != uint32(3) {
 		return BaseCommand{}, fmt.Errorf("expecting three while parsing game command, three=%v", three)
 	}
-	offset += 4
+
 	playerId := -1
 	if commandType == 19 {
 		playerId = int(derefedData[tenBytesOffset+7])

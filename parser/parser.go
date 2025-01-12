@@ -7,6 +7,13 @@ import (
 	"os"
 )
 
+// Parse is the main entry point for the parser.
+// Note that there are a LOT of opportunities to parallelize work in this parser using lightweight go routines. However,
+// for now we will forego this optimizations until the parser becomes unreasonable slow. At a high level the only
+// parallelization we will do will be at the replay level. Eventually the parser will allow you to provide a glob
+// pattern or multiple files as input and each file will be parsed in its own go routine.
+// If we do need to add more optimization, all of the recursive functions could easily spin up a go routine to parse its
+// subtree.
 func Parse(replayPath string) error {
 	data, err := os.ReadFile(replayPath)
 	if err != nil {
@@ -25,10 +32,16 @@ func Parse(replayPath string) error {
 	}
 	slog.Debug(buildString)
 
-	err = parseXmb(&data, rootNode)
+	xmbMap, err := getXmbMap(&data, rootNode)
 	if err != nil {
 		return err
 	}
+
+	techTreeRootNode, err := parseXmb(&data, xmbMap["techtree"])
+	if err != nil {
+		return err
+	}
+	slog.Debug("Tech Tree Root Node", "techTreeRootNode", len(techTreeRootNode.children))
 
 	_, err = parseProfileKeys(&data, rootNode)
 	if err != nil {
@@ -36,9 +49,22 @@ func Parse(replayPath string) error {
 	}
 	// printProfileKeys(profileKeys)
 
-	_, err = ParseCommandList(&data, rootNode.endOffset())
+	commandList, err := ParseCommandList(&data, rootNode.endOffset())
 	if err != nil {
 		return err
+	}
+
+	for _, wrapper := range commandList {
+		for _, command := range wrapper.commands {
+			if researchCmd, ok := command.(ResearchCommand); ok {
+				tech := techTreeRootNode.children[researchCmd.techId]
+				slog.Debug("Research Command", "tech", tech.attributes["name"], "playerId", researchCmd.playerId)
+			}
+			if prequeueTechCmd, ok := command.(PrequeueTechCommand); ok {
+				tech := techTreeRootNode.children[prequeueTechCmd.techId]
+				slog.Debug("Prequeue Tech Command", "tech", tech.attributes["name"], "playerId", prequeueTechCmd.playerId)
+			}
+		}
 	}
 
 	return nil

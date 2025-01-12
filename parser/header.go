@@ -1,51 +1,8 @@
 package parser
 
 import (
-	"fmt"
 	"log/slog"
 )
-
-const OUTER_HIERARCHY_START_OFFSET = 257
-const MAX_SCAN_OFFSET = 50
-const DATA_OFFSET = 6
-const ROOT_NODE_TOKEN = "BG"
-
-var NODES_WITH_SUBSTRUCTURE = map[string]struct{}{
-	"BG": {},
-	"J1": {},
-	"PL": {},
-	"BP": {},
-	"MP": {},
-	"GM": {},
-	"GD": {},
-}
-
-type NoChildNodesError string
-
-func (err NoChildNodesError) Error() string {
-	return fmt.Sprintf("No child node found searching for: %v", string(err))
-}
-
-type MultipleNodesError string
-
-func (err MultipleNodesError) Error() string {
-	return fmt.Sprintf("Multiple child nodes found for %v, but expected only 1!", string(err))
-}
-
-type NotRootNodeError Node
-
-func (node NotRootNodeError) Error() string {
-	errString := fmt.Sprintf("%v is not a root node! Root node must be %v", node.token, ROOT_NODE_TOKEN)
-	return errString
-}
-
-type Node struct {
-	token    string
-	offset   int
-	size     uint32
-	parent   *Node
-	children []*Node
-}
 
 func ParseHeader(data *[]byte) Node {
 	rootNode := newNode(data, OUTER_HIERARCHY_START_OFFSET)
@@ -53,50 +10,6 @@ func ParseHeader(data *[]byte) Node {
 	createTree(data, &rootNode)
 	// printTree(rootNode)
 	return rootNode
-}
-
-func (node Node) endOffset() int {
-	return node.offset + int(node.size) + DATA_OFFSET
-}
-
-func (node Node) path() string {
-	/*
-	   A string representing the "path" of the node based on its and its parents tokens. For example, if this node
-	   has a token of JK and the parent is AB the path would be AB/JK.
-	*/
-	if node.parent == nil {
-		return node.token
-	}
-
-	return node.parent.path() + "/" + node.token
-}
-
-func (node Node) getChildren(path ...string) []Node {
-	/*
-	   Get the children of this node that match the give path. Some paths have more than one node. For example, there
-	   are multiple nodes with the XN/XN/XN path.
-	*/
-	if len(path) == 0 {
-		return []Node{node}
-	}
-
-	nodes := make([]Node, 0)
-	for _, child := range node.children {
-		if child.token == path[0] {
-			nodes = append(nodes, child.getChildren(path[1:]...)...)
-		}
-	}
-	return nodes
-}
-
-func (node Node) String() string {
-	return node.path() + fmt.Sprintf(
-		" -- offset=%d end_offset=%d size=%d children=%d",
-		node.offset,
-		node.endOffset(),
-		node.size,
-		len(node.children),
-	)
 }
 
 func printTree(node Node) {
