@@ -1,11 +1,32 @@
 package parser
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 )
+
+func ParseToJson(replayPath string, prettyPrint bool) (string, error) {
+	replayFormat, err := Parse(replayPath)
+	if err != nil {
+		return "", err
+	}
+
+	var jsonBytes []byte
+	if prettyPrint {
+		jsonBytes, err = json.MarshalIndent(replayFormat, "", "    ")
+	} else {
+		jsonBytes, err = json.Marshal(replayFormat)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(jsonBytes), nil
+}
 
 // Parse is the main entry point for the parser.
 // Note that there are a LOT of opportunities to parallelize work in this parser using lightweight go routines. However,
@@ -14,86 +35,45 @@ import (
 // pattern or multiple files as input and each file will be parsed in its own go routine.
 // If we do need to add more optimization, all of the recursive functions could easily spin up a go routine to parse its
 // subtree.
-func Parse(replayPath string) error {
+func Parse(replayPath string) (ReplayFormat, error) {
 	data, err := os.ReadFile(replayPath)
 	if err != nil {
-		return err
+		return ReplayFormat{}, err
 	}
 
 	data, err = Decompressl33t(&data)
 	if err != nil {
-		return err
+		return ReplayFormat{}, err
 	}
 
-	rootNode := ParseHeader(&data)
-	buildString, err := readBuildString(&data, rootNode)
-	if err != nil {
-		return err
-	}
-	slog.Debug(buildString)
+	rootNode := parseHeader(&data)
 
-	xmbMap, err := getXmbMap(&data, rootNode)
+	xmbMap, err := parseXmbMap(&data, rootNode)
 	if err != nil {
-		return err
+		return ReplayFormat{}, err
 	}
 
-	techTreeRootNode, err := parseXmb(&data, xmbMap["techtree"])
+	profileKeys, err := parseProfileKeys(&data, rootNode)
 	if err != nil {
-		return err
-	}
-	slog.Debug("Tech Tree Root Node", "techTreeRootNode", len(techTreeRootNode.children))
-
-	_, err = parseProfileKeys(&data, rootNode)
-	if err != nil {
-		return err
+		return ReplayFormat{}, err
 	}
 	// printProfileKeys(profileKeys)
 
-	commandList, err := ParseCommandList(&data, rootNode.endOffset())
+	commandList, err := parseGameCommands(&data, rootNode.endOffset())
 	if err != nil {
-		return err
+		return ReplayFormat{}, err
 	}
 
-	for _, wrapper := range commandList {
-		for _, command := range wrapper.commands {
-			if researchCmd, ok := command.(ResearchCommand); ok {
-				tech := techTreeRootNode.children[researchCmd.techId]
-				slog.Debug("Research Command", "tech", tech.attributes["name"], "playerId", researchCmd.playerId)
-			}
-			if prequeueTechCmd, ok := command.(PrequeueTechCommand); ok {
-				tech := techTreeRootNode.children[prequeueTechCmd.techId]
-				slog.Debug("Prequeue Tech Command", "tech", tech.attributes["name"], "playerId", prequeueTechCmd.playerId)
-			}
-		}
+	replayFormat, err := formatRawDataToReplay(&data, &rootNode, &profileKeys, &xmbMap, &commandList)
+	if err != nil {
+		return ReplayFormat{}, err
 	}
 
-	return nil
+	return replayFormat, nil
 }
 
 func isRootNode(node Node) bool {
 	return node.token == ROOT_NODE_TOKEN
-}
-
-func readBuildString(data *[]byte, node Node) (string, error) {
-	/*
-	   Finds the FH node, then reads the string at the FH node offset to get the build information. There is other
-	   information in the FH node, but I don't know what it is.
-	*/
-	if !isRootNode(node) {
-		return "", NotRootNodeError(node)
-	}
-	children := node.getChildren("FH")
-	if len(children) == 0 {
-		return "", NoChildNodesError("FH")
-	}
-	if len(children) > 1 {
-		return "", MultipleNodesError("FH")
-	}
-
-	fhNode := children[0]
-	position := fhNode.offset + DATA_OFFSET
-	return readString(data, position).value, nil
-
 }
 
 type ProfileKey struct {
@@ -200,6 +180,7 @@ func parseProfileKeys(data *[]byte, node Node) (map[string]ProfileKey, error) {
 }
 
 func printProfileKeys(profileKeys map[string]ProfileKey) {
+	// Useful for debugging, prints out all profile keys and their values
 	for keyname, profileKey := range profileKeys {
 		log := ""
 		log += fmt.Sprintf("keyname=%v", keyname)

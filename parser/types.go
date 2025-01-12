@@ -1,6 +1,9 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // ===============================
 // Common types
@@ -101,13 +104,16 @@ type GameCommand interface {
 	OffsetEnd() int
 	PlayerId() int
 	ByteLength() int
+	GameTimeSecs() float64
 }
 
 type BaseCommand struct {
-	commandType int
-	playerId    int
-	offsetEnd   int
-	byteLength  int
+	commandType  int
+	playerId     int
+	offset       int
+	offsetEnd    int
+	byteLength   int
+	gameTimeSecs float64
 }
 
 func (cmd BaseCommand) CommandType() int {
@@ -126,6 +132,10 @@ func (cmd BaseCommand) ByteLength() int {
 	return cmd.byteLength
 }
 
+func (cmd BaseCommand) GameTimeSecs() float64 {
+	return cmd.gameTimeSecs
+}
+
 type ResearchCommand struct {
 	BaseCommand
 	techId int32
@@ -134,6 +144,17 @@ type ResearchCommand struct {
 type PrequeueTechCommand struct {
 	BaseCommand
 	techId int32
+}
+
+type TrainCommand struct {
+	BaseCommand
+	protoUnitId int32
+	numUnits    int8
+}
+
+type AutoqueueCommand struct {
+	BaseCommand
+	protoUnitId int32
 }
 
 type CommandList struct {
@@ -172,4 +193,41 @@ type XmbNode struct {
 	value       string
 	attributes  map[string]string
 	children    []*XmbNode
+}
+
+// =============================================================================================
+// Replay formats, parser output, the human readable output, good for use in other applications
+// =============================================================================================
+
+type ReplayFormat struct {
+	MapName        string
+	BuildNumber    int
+	BuildString    string
+	ParsedAt       time.Time
+	ParserVersion  string
+	GameLengthSecs float64
+	GameSeed       int
+	WinningTeam    int
+	GameOptions    map[string]bool
+	Players        []ReplayPlayer
+	GameCommands   []ReplayGameCommand
+}
+
+type ReplayPlayer struct {
+	PlayerNum int
+	TeamId    int
+	Name      string
+	ProfileId int
+	Color     int
+	RandomGod bool
+	God       string
+	Winner    bool
+	MinorGods [3]string
+}
+
+type ReplayGameCommand struct {
+	GameTimeSecs float64
+	CommandType  string
+	PlayerNum    int
+	Value        string
 }

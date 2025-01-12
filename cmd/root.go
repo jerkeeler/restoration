@@ -25,7 +25,7 @@ func Execute() {
 
 func init() {
 	verbose := false
-	parseCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		opts := &slog.HandlerOptions{
 			Level: slog.LevelInfo,

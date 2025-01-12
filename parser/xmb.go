@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-func getXmbMap(data *[]byte, rootNode Node) (map[string]XmbFile, error) {
+func parseXmbMap(data *[]byte, rootNode Node) (map[string]XmbFile, error) {
 	slog.Debug("Parsing XMB data set from nodes GM/GD/gd")
 	children := rootNode.getChildren("GM", "GD", "gd")
 	xmbMap := make(map[string]XmbFile)
@@ -81,7 +81,7 @@ func parseXmb(data *[]byte, xmbFile XmbFile) (XmbNode, error) {
 	numAttributes := readUint32(data, offset)
 	offset += 4
 	attributes := make([]string, numAttributes)
-	slog.Debug("Num Attributes", "numAttributes", numAttributes)
+	// slog.Debug("Num Attributes", "numAttributes", numAttributes)
 	for i := uint32(0); i < numAttributes; i++ {
 		str := readString(data, offset)
 		offset = str.endOffset

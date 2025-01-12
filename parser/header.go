@@ -4,10 +4,10 @@ import (
 	"log/slog"
 )
 
-func ParseHeader(data *[]byte) Node {
+func parseHeader(data *[]byte) Node {
 	rootNode := newNode(data, OUTER_HIERARCHY_START_OFFSET)
 	slog.Debug("Parsing header tree")
-	createTree(data, &rootNode)
+	parseTree(data, &rootNode)
 	// printTree(rootNode)
 	return rootNode
 }
@@ -39,7 +39,7 @@ func newNode(data *[]byte, offset int) Node {
 	}
 }
 
-func createTree(data *[]byte, parentNode *Node) {
+func parseTree(data *[]byte, parentNode *Node) {
 	/*
 	   Recursively build up the header tree using a breadth first search approach.
 	*/
@@ -59,7 +59,7 @@ func createTree(data *[]byte, parentNode *Node) {
 
 	for _, child := range parentNode.children {
 		if _, exists := NODES_WITH_SUBSTRUCTURE[child.token]; exists {
-			createTree(data, child)
+			parseTree(data, child)
 		}
 	}
 

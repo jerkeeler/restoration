@@ -2,12 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/jerkeeler/restoration/parser"
 	"github.com/spf13/cobra"
 )
+
+var outputPath string
+var quiet bool = false
+var prettyPrint bool = false
 
 // parseCmd represents the parse command
 var parseCmd = &cobra.Command{
@@ -21,25 +26,46 @@ var parseCmd = &cobra.Command{
 			fmt.Printf("Error with filepath: %v\n", err)
 			return
 		}
-		err = parser.Parse(absPath)
+
+		json, err := parser.ParseToJson(absPath, prettyPrint)
 		if err != nil {
-			fmt.Printf("error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return
 		}
+		if !quiet {
+			fmt.Println(json)
+		}
+
+		if outputPath != "" && json != "" {
+			slog.Debug("outputPath", "outputPath", outputPath)
+			err = os.WriteFile(outputPath, []byte(json), 0644)
+			if err != nil {
+				fmt.Printf("Error writing to file: %v\n", err)
+				return
+			}
+		}
+
+		slog.Debug("Done parsing!")
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(parseCmd)
+	parseCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Save the output JSON to the provided filepath")
+	parseCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Quiet mode, no output to standard output")
+	parseCmd.Flags().BoolVarP(&prettyPrint, "pretty-print", "p", false, "Pretty print the output JSON")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// parseCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// parseCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	parseCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		if outputPath == "" {
+			return
+		}
+		outputPath = filepath.Clean(outputPath)
+		absPath, err := filepath.Abs(outputPath)
+		if err != nil {
+			return
+		}
+		outputPath = absPath
+	}
 }
 
 type InvalidPath string
