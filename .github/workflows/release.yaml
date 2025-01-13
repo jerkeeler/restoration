@@ -19,24 +19,24 @@ jobs:
       - name: Build
         run: |
           # Windows
-          GOOS=windows GOARCH=amd64 go build -trimpath -o myrecparser-windows-amd64.exe
+          GOOS=windows GOARCH=amd64 go build -trimpath -o restoration-windows-amd64.exe
 
           # Linux
-          GOOS=linux GOARCH=amd64 go build -trimpath -o myrecparser-linux-amd64
+          GOOS=linux GOARCH=amd64 go build -trimpath -o restoration-linux-amd64
 
           # MacOS Intel
-          GOOS=darwin GOARCH=amd64 go build -trimpath -o myrecparser-darwin-amd64
+          GOOS=darwin GOARCH=amd64 go build -trimpath -o restoration-darwin-amd64
 
           # MacOS ARM
-          GOOS=darwin GOARCH=arm64 go build -trimpath -o myrecparser-darwin-arm64
+          GOOS=darwin GOARCH=arm64 go build -trimpath -o restoration-darwin-arm64
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            myrecparser-windows-amd64.exe
-            myrecparser-linux-amd64
-            myrecparser-darwin-amd64
-            myrecparser-darwin-arm64
+            restoration-windows-amd64.exe
+            restoration-linux-amd64
+            restoration-darwin-amd64
+            restoration-darwin-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
