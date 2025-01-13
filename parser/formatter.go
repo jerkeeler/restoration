@@ -55,10 +55,9 @@ func formatRawDataToReplay(
 		}
 	}
 
-	var gameOptions map[string]bool
+	gameOptions := getGameOptions(profileKeys)
 	var gameCommands []ReplayGameCommand
 	if !slim {
-		gameOptions = getGameOptions(profileKeys)
 		protoRootNode, err := parseXmb(data, (*xmbMap)["proto"])
 		if err != nil {
 			return ReplayFormatted{}, err
