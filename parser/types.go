@@ -20,6 +20,12 @@ func (err NotL33t) Error() string {
 	return string(err)
 }
 
+type Vector3 struct {
+	X int32
+	Y int32
+	Z int32
+}
+
 // ===============================
 // Node and header types
 // ===============================
@@ -105,6 +111,7 @@ type GameCommand interface {
 	PlayerId() int
 	ByteLength() int
 	GameTimeSecs() float64
+	AffectsEAPM() bool
 }
 
 type BaseCommand struct {
@@ -114,6 +121,7 @@ type BaseCommand struct {
 	offsetEnd    int
 	byteLength   int
 	gameTimeSecs float64
+	affectsEAPM  bool
 }
 
 func (cmd BaseCommand) CommandType() int {
@@ -136,6 +144,10 @@ func (cmd BaseCommand) GameTimeSecs() float64 {
 	return cmd.gameTimeSecs
 }
 
+func (cmd BaseCommand) AffectsEAPM() bool {
+	return cmd.affectsEAPM
+}
+
 type ResearchCommand struct {
 	BaseCommand
 	techId int32
@@ -155,6 +167,18 @@ type TrainCommand struct {
 type AutoqueueCommand struct {
 	BaseCommand
 	protoUnitId int32
+}
+
+type BuildCommand struct {
+	BaseCommand
+	protoBuildingId int32
+	queued          bool
+	location        Vector3
+}
+
+type ProtoPowerCommand struct {
+	BaseCommand
+	protoPowerId int32
 }
 
 type CommandList struct {
@@ -199,7 +223,7 @@ type XmbNode struct {
 // Replay formats, parser output, the human readable output, good for use in other applications
 // =============================================================================================
 
-type ReplayFormat struct {
+type ReplayFormatted struct {
 	MapName        string
 	BuildNumber    int
 	BuildString    string
@@ -222,6 +246,7 @@ type ReplayPlayer struct {
 	RandomGod bool
 	God       string
 	Winner    bool
+	EAPM      float64
 	MinorGods [3]string
 }
 

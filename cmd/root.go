@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var isGzip bool = false
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "restoration",
@@ -25,6 +27,7 @@ func Execute() {
 
 func init() {
 	verbose := false
+	rootCmd.PersistentFlags().BoolVar(&isGzip, "is-gzip", false, "Indicates whether the input files are compressed with gzip")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		opts := &slog.HandlerOptions{

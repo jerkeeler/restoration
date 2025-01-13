@@ -13,6 +13,8 @@ import (
 var outputPath string
 var quiet bool = false
 var prettyPrint bool = false
+var slim bool = false
+var stats bool = false
 
 // parseCmd represents the parse command
 var parseCmd = &cobra.Command{
@@ -21,13 +23,18 @@ var parseCmd = &cobra.Command{
 	Long:  `Parses .mythrec files to human-readable json`,
 	Args:  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
+		if stats && slim {
+			fmt.Fprintf(os.Stderr, "error: you cannot use stats and slim mode together\n")
+			return
+		}
+
 		absPath, err := validateAndExpandPath(args[0])
 		if err != nil {
 			fmt.Printf("Error with filepath: %v\n", err)
 			return
 		}
 
-		json, err := parser.ParseToJson(absPath, prettyPrint)
+		json, err := parser.ParseToJson(absPath, prettyPrint, slim, stats, isGzip)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return
@@ -53,7 +60,14 @@ func init() {
 	rootCmd.AddCommand(parseCmd)
 	parseCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Save the output JSON to the provided filepath")
 	parseCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Quiet mode, no output to standard output")
-	parseCmd.Flags().BoolVarP(&prettyPrint, "pretty-print", "p", false, "Pretty print the output JSON")
+	parseCmd.Flags().BoolVar(&prettyPrint, "pretty-print", false, "Pretty print the output JSON")
+	parseCmd.Flags().BoolVar(&slim, "slim", false, "Slim mode, don't output game commands")
+	parseCmd.Flags().BoolVar(
+		&stats,
+		"stats",
+		false,
+		"Stats mode, add stats to the output, you cannot use this with slim mode",
+	)
 
 	parseCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		if outputPath == "" {

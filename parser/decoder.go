@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"compress/gzip"
 	"compress/zlib"
 	"encoding/binary"
 	"fmt"
@@ -27,6 +28,14 @@ func readInt32(data *[]byte, offset int) int32 {
 
 func readBool(data *[]byte, offset int) bool {
 	return (*data)[offset] != 0
+}
+
+func readVector(data *[]byte, offset int) Vector3 {
+	return Vector3{
+		X: readInt32(data, offset),
+		Y: readInt32(data, offset+4),
+		Z: readInt32(data, offset+8),
+	}
 }
 
 func readString(data *[]byte, offset int) RecString {
@@ -71,6 +80,16 @@ func Decompressl33t(compressed_array *[]byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return io.ReadAll(reader)
+}
+
+func DecompressGzip(compressed_array *[]byte) ([]byte, error) {
+	reader, err := gzip.NewReader(bytes.NewReader(*compressed_array))
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
 
 	return io.ReadAll(reader)
 }

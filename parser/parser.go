@@ -8,8 +8,8 @@ import (
 	"os"
 )
 
-func ParseToJson(replayPath string, prettyPrint bool) (string, error) {
-	replayFormat, err := Parse(replayPath)
+func ParseToJson(replayPath string, prettyPrint bool, slim bool, stats bool, isGzip bool) (string, error) {
+	replayFormat, err := Parse(replayPath, slim, stats, isGzip)
 	if err != nil {
 		return "", err
 	}
@@ -35,38 +35,52 @@ func ParseToJson(replayPath string, prettyPrint bool) (string, error) {
 // pattern or multiple files as input and each file will be parsed in its own go routine.
 // If we do need to add more optimization, all of the recursive functions could easily spin up a go routine to parse its
 // subtree.
-func Parse(replayPath string) (ReplayFormat, error) {
+func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatted, error) {
 	data, err := os.ReadFile(replayPath)
 	if err != nil {
-		return ReplayFormat{}, err
+		return ReplayFormatted{}, err
+	}
+
+	if isGzip {
+		data, err = DecompressGzip(&data)
+
+		if err != nil {
+			return ReplayFormatted{}, err
+		}
 	}
 
 	data, err = Decompressl33t(&data)
 	if err != nil {
-		return ReplayFormat{}, err
+		return ReplayFormatted{}, err
 	}
 
 	rootNode := parseHeader(&data)
 
+	// Note, we are not parsing all XMB files here. We are parsing the map of XMB files so we know where they are.
+	// Since the XMB files are large we'll saving parsing them until we need them and simply pass the map of XMB files
+	// around instead.
 	xmbMap, err := parseXmbMap(&data, rootNode)
 	if err != nil {
-		return ReplayFormat{}, err
+		return ReplayFormatted{}, err
 	}
+	// for key, _ := range xmbMap {
+	// 	fmt.Println(key)
+	// }
 
 	profileKeys, err := parseProfileKeys(&data, rootNode)
 	if err != nil {
-		return ReplayFormat{}, err
+		return ReplayFormatted{}, err
 	}
 	// printProfileKeys(profileKeys)
 
 	commandList, err := parseGameCommands(&data, rootNode.endOffset())
 	if err != nil {
-		return ReplayFormat{}, err
+		return ReplayFormatted{}, err
 	}
 
-	replayFormat, err := formatRawDataToReplay(&data, &rootNode, &profileKeys, &xmbMap, &commandList)
+	replayFormat, err := formatRawDataToReplay(slim, stats, &data, &rootNode, &profileKeys, &xmbMap, &commandList)
 	if err != nil {
-		return ReplayFormat{}, err
+		return ReplayFormatted{}, err
 	}
 
 	return replayFormat, nil

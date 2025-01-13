@@ -40,6 +40,7 @@ func newBaseCommand(offset int, commandType int, playerId int, lastCommandListId
 		// Basically, the game ticks every 1/20 of a second and batches commands that occur in between into one command list
 		// so we can use the index of the command list to get the game time.
 		gameTimeSecs: float64(lastCommandListIdx) / 20.0,
+		affectsEAPM:  true,
 	}
 	return cmd
 }
@@ -52,6 +53,7 @@ func enrichBaseCommand(baseCommand BaseCommand, byteLength int) BaseCommand {
 		gameTimeSecs: baseCommand.gameTimeSecs,
 		byteLength:   byteLength,
 		offsetEnd:    baseCommand.offset + byteLength,
+		affectsEAPM:  baseCommand.affectsEAPM,
 	}
 }
 
@@ -93,14 +95,6 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 	2: func(data *[]byte, baseCommand BaseCommand) GameCommand {
 		// The train commands contains 4 Int32s (16 bytes) and 2 Int8s (2 bytes). The 3rd, Int32 is the protoUnitId,
 		// and the last Int8 is the number of units queued.
-		// inputTypes := []func() int{
-		// 	unpackInt32,
-		// 	unpackInt32,
-		// 	unpackInt32,
-		// 	unpackInt32,
-		// 	unpackInt8,
-		// 	unpackInt8,
-		// }
 		byteLength := 18
 		protoUnitId := readInt32(data, baseCommand.offset+8)
 		numUnits := int8((*data)[baseCommand.offset+18])
@@ -113,24 +107,19 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 
 	// build
 	3: func(data *[]byte, baseCommand BaseCommand) GameCommand {
-		inputTypes := []func() int{
-			unpackInt32,
-			unpackInt32,
-			unpackInt32,
-			unpackVector,
-			unpackInt32,
-			unpackInt32,
-			unpackFloat,
-			unpackInt32,
-			unpackInt32,
-			unpackInt32,
-			unpackInt32,
+		// The build command is 52 bytes in length, consisting of the following values in sequence:
+		// 4 int32s, 1 vector, 2 int32s 1 float, 4 int32s
+		byteLength := 52
+		// queued attribute comes from "preargument bytes", we will leave it as false for now
+		// protoUnitId comes from the 3rd int32 in the command
+		protoUnitId := readInt32(data, baseCommand.offset+8)
+		location := readVector(data, baseCommand.offset+12)
+		return BuildCommand{
+			BaseCommand:     enrichBaseCommand(baseCommand, byteLength),
+			protoBuildingId: protoUnitId,
+			location:        location,
+			queued:          false,
 		}
-		byteLength := 0
-		for _, f := range inputTypes {
-			byteLength += f()
-		}
-		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
 	4: func(data *[]byte, baseCommand BaseCommand) GameCommand {
@@ -139,6 +128,8 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 		for _, f := range inputTypes {
 			byteLength += f()
 		}
+		// Currently this command triggers a Task subtype move command immediately afterwards, so we don't want to double count
+		baseCommand.affectsEAPM = false
 		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
@@ -164,24 +155,21 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 
 	// useProtoPower
 	12: func(data *[]byte, baseCommand BaseCommand) GameCommand {
-		inputTypes := []func() int{
-			unpackInt32,
-			unpackInt32,
-			unpackInt32,
-			unpackVector,
-			unpackVector,
-			unpackInt32,
-			unpackInt32,
-			unpackFloat,
-			unpackInt32,
-			unpackInt32,
-			unpackInt8,
+		// useProtoPower is 57 bytes in length consisting of:
+		// 3 int32s, 2 vectors, 2 int32s, 1 float, 2 int32s, 1 int8
+		// the last int32 is the protoPowerId that maps to a string god power via the proto XMB data
+		// Proto powers are unit abilities that are cast by a unit manually by the player (e.g., if the player
+		// casts the centaur rain of arrows power) AND god powers. The names are stored in the powers XMB data file
+		// stored in the header of the replay.
+		//
+		// The two vectors are the target locations of the power being used, if it has a location. If it has a second
+		// location (e.g., shifting sands, underworld, etc...) the second vector will be the second location.
+		byteLength := 57
+		protoPowerId := readInt32(data, baseCommand.offset+52)
+		return ProtoPowerCommand{
+			BaseCommand:  enrichBaseCommand(baseCommand, byteLength),
+			protoPowerId: protoPowerId,
 		}
-		byteLength := 0
-		for _, f := range inputTypes {
-			byteLength += f()
-		}
-		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
 	// marketBuySellResources
@@ -211,6 +199,7 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 		for _, f := range inputTypes {
 			byteLength += f()
 		}
+		baseCommand.affectsEAPM = false
 		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
@@ -281,6 +270,7 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 		for _, f := range inputTypes {
 			byteLength += f()
 		}
+		baseCommand.affectsEAPM = false
 		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
@@ -291,6 +281,9 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 		for _, f := range inputTypes {
 			byteLength += f()
 		}
+		// Every time you change a control group, the game triggers one event per unit in the group (removing them) and then readds them all, with 1 event per unit
+		// Including this would inflate CPM by a LOT.
+		baseCommand.affectsEAPM = false
 		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
@@ -363,6 +356,8 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 		for _, f := range inputTypes {
 			byteLength += f()
 		}
+		// debateable, selecting a lot of units and doing this creates one command per unit transformed
+		baseCommand.affectsEAPM = false
 		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
@@ -415,6 +410,8 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 		for _, f := range inputTypes {
 			byteLength += f()
 		}
+		// Making a simple wall puts out a LOT of these.
+		baseCommand.affectsEAPM = false
 		return enrichBaseCommand(baseCommand, byteLength)
 	},
 
@@ -444,11 +441,8 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 
 	// prebuyGodPower
 	75: func(data *[]byte, baseCommand BaseCommand) GameCommand {
-		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
-		byteLength := 0
-		for _, f := range inputTypes {
-			byteLength += f()
-		}
+		// The prebuyGodPower command is 16 bytes in length, consisting of 4 int32s. The 3rd xint32 is the protoPowerId.
+		byteLength := 16
 		return enrichBaseCommand(baseCommand, byteLength)
 	},
 }
