@@ -81,7 +81,7 @@ func formatRawDataToReplay(
 		BuildNumber:    buildNumber,
 		BuildString:    buildString,
 		ParsedAt:       time.Now(),
-		ParserVersion:  "0.1.0",
+		ParserVersion:  VERSION,
 		GameLengthSecs: (*commandList)[len(*commandList)-1].GameTimeSecs(),
 		GameSeed:       int((*profileKeys)["gamerandomseed"].Int32Val),
 		WinningTeam:    winningTeam,
