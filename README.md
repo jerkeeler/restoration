@@ -103,85 +103,78 @@ Global Flags:
 ### Example Output
 
 Example output running the parse command in a slim mode and pretty printed:
+
 ```bash
 ./restoration-darwin-arm64 parse IamMagic_vs_TAG_RecoN.mythrec.gz --is-gzip --slim --pretty-print
 ```
 
 ```json
 {
-    "MapName": "alfheim",
-    "BuildNumber": 512899,
-    "BuildString": "AoMRT_s.exe 512899 //stream/Athens/stable",
-    "ParsedAt": "2025-01-13T15:05:00.554616-05:00",
-    "ParserVersion": "0.1.0",
-    "GameLengthSecs": 1381.1,
-    "GameSeed": 31019,
-    "WinningTeam": 0,
-    "GameOptions": {
-        "gameaivsai": false,
-        "gameallowaiassist": false,
-        "gameallowcheats": false,
-        "gameallowtitans": true,
-        "gameblockade": false,
-        "gameconquest": false,
-        "gamecontrolleronly": false,
-        "gamefreeforall": false,
-        "gameismpcoop": false,
-        "gameismpscenario": false,
-        "gamekoth": false,
-        "gameludicrousmode": false,
-        "gamemaprecommendedsettings": false,
-        "gamemilitaryautoqueue": false,
-        "gamenomadstart": false,
-        "gameonevsall": false,
-        "gameregicide": false,
-        "gamerestored": false,
-        "gamerestrictpause": true,
-        "gamermdebug": false,
-        "gamestorymode": false,
-        "gamesuddendeath": false,
-        "gameteambalanced": false,
-        "gameteamlock": true,
-        "gameteamsharepop": false,
-        "gameteamshareres": false,
-        "gameteamvictory": false,
-        "gameusedenforcedagesettings": false
+  "MapName": "alfheim",
+  "BuildNumber": 512899,
+  "BuildString": "AoMRT_s.exe 512899 //stream/Athens/stable",
+  "ParsedAt": "2025-01-13T15:05:00.554616-05:00",
+  "ParserVersion": "0.1.0",
+  "GameLengthSecs": 1381.1,
+  "GameSeed": 31019,
+  "WinningTeam": 0,
+  "GameOptions": {
+    "gameaivsai": false,
+    "gameallowaiassist": false,
+    "gameallowcheats": false,
+    "gameallowtitans": true,
+    "gameblockade": false,
+    "gameconquest": false,
+    "gamecontrolleronly": false,
+    "gamefreeforall": false,
+    "gameismpcoop": false,
+    "gameismpscenario": false,
+    "gamekoth": false,
+    "gameludicrousmode": false,
+    "gamemaprecommendedsettings": false,
+    "gamemilitaryautoqueue": false,
+    "gamenomadstart": false,
+    "gameonevsall": false,
+    "gameregicide": false,
+    "gamerestored": false,
+    "gamerestrictpause": true,
+    "gamermdebug": false,
+    "gamestorymode": false,
+    "gamesuddendeath": false,
+    "gameteambalanced": false,
+    "gameteamlock": true,
+    "gameteamsharepop": false,
+    "gameteamshareres": false,
+    "gameteamvictory": false,
+    "gameusedenforcedagesettings": false
+  },
+  "Players": [
+    {
+      "PlayerNum": 1,
+      "TeamId": 0,
+      "Name": "IamMagic",
+      "ProfileId": 1073764190,
+      "Color": 1,
+      "RandomGod": false,
+      "God": "Gaia",
+      "Winner": true,
+      "EAPM": 118.07979147056695,
+      "MinorGods": ["Oceanus", "Theia", "Atlas"]
     },
-    "Players": [
-        {
-            "PlayerNum": 1,
-            "TeamId": 0,
-            "Name": "IamMagic",
-            "ProfileId": 1073764190,
-            "Color": 1,
-            "RandomGod": false,
-            "God": "Gaia",
-            "Winner": true,
-            "EAPM": 118.07979147056695,
-            "MinorGods": [
-                "Oceanus",
-                "Theia",
-                "Atlas"
-            ]
-        },
-        {
-            "PlayerNum": 2,
-            "TeamId": 1,
-            "Name": "TAG_RecoN",
-            "ProfileId": 1073796204,
-            "Color": 2,
-            "RandomGod": false,
-            "God": "Zeus",
-            "Winner": false,
-            "EAPM": 77.19933386431106,
-            "MinorGods": [
-                "Athena",
-                "Apollo",
-                "Hera"
-            ]
-        }
-    ],
-    "GameCommands": null
+    {
+      "PlayerNum": 2,
+      "TeamId": 1,
+      "Name": "TAG_RecoN",
+      "ProfileId": 1073796204,
+      "Color": 2,
+      "RandomGod": false,
+      "God": "Zeus",
+      "Winner": false,
+      "EAPM": 77.19933386431106,
+      "MinorGods": ["Athena", "Apollo", "Hera"]
+    }
+  ],
+  "GameCommands": null
 }
 ```
 
@@ -189,44 +182,44 @@ Game commands will be a long list that looks like the following when not in slim
 
 ```json
 {
-    "GameCommands": [
-        {
-            "GameTimeSecs": 8.35,
-            "CommandType": "build",
-            "PlayerNum": 1,
-            "Value": "EconomicGuild"
-        },
-        {
-            "GameTimeSecs": 18.9,
-            "CommandType": "build",
-            "PlayerNum": 2,
-            "Value": "Storehouse"
-        },
-        {
-            "GameTimeSecs": 21,
-            "CommandType": "godPower",
-            "PlayerNum": 1,
-            "Value": "GaiaForest"
-        },
-        {
-            "GameTimeSecs": 22.05,
-            "CommandType": "research",
-            "PlayerNum": 1,
-            "Value": "Pickaxe"
-        },
-        {
-            "GameTimeSecs": 128.6,
-            "CommandType": "autoqueue",
-            "PlayerNum": 2,
-            "Value": "VillagerGreek"
-        },
-        {
-            "GameTimeSecs": 143.2,
-            "CommandType": "train",
-            "PlayerNum": 2,
-            "Value": "Jason"
-        },
-    ]
+  "GameCommands": [
+    {
+      "GameTimeSecs": 8.35,
+      "CommandType": "build",
+      "PlayerNum": 1,
+      "Value": "EconomicGuild"
+    },
+    {
+      "GameTimeSecs": 18.9,
+      "CommandType": "build",
+      "PlayerNum": 2,
+      "Value": "Storehouse"
+    },
+    {
+      "GameTimeSecs": 21,
+      "CommandType": "godPower",
+      "PlayerNum": 1,
+      "Value": "GaiaForest"
+    },
+    {
+      "GameTimeSecs": 22.05,
+      "CommandType": "research",
+      "PlayerNum": 1,
+      "Value": "Pickaxe"
+    },
+    {
+      "GameTimeSecs": 128.6,
+      "CommandType": "autoqueue",
+      "PlayerNum": 2,
+      "Value": "VillagerGreek"
+    },
+    {
+      "GameTimeSecs": 143.2,
+      "CommandType": "train",
+      "PlayerNum": 2,
+      "Value": "Jason"
+    }
+  ]
 }
 ```
 
@@ -254,5 +247,6 @@ Game commands will be a long list that looks like the following when not in slim
 - A general rule of thumb is that a `parse*` function is working on the underlying byte slice and everything else is using data that has been marshalled into a coherent data structure
 - Anyone is open to contributing to this repo, just open a PR and I will review it
 - Always use `slog` and never use `fmt.Println`
-    - Be liberal with `slog.Debug`
+  - Be liberal with `slog.Debug`
 - Keep the output from the `parse` command clean, it should only be JSON. Ideally one can then take the standard output and pipe it into a file or any other tool (such as `jq`).
+  - For example you could get the mapname and winners using this jq string: `jq '{map: .MapName, players: [.Players[] | {name: .Name, winner: .Winner}]}' test.json`

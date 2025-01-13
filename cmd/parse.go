@@ -25,18 +25,21 @@ var parseCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if stats && slim {
 			fmt.Fprintf(os.Stderr, "error: you cannot use stats and slim mode together\n")
+			os.Exit(1)
 			return
 		}
 
 		absPath, err := validateAndExpandPath(args[0])
 		if err != nil {
 			fmt.Printf("Error with filepath: %v\n", err)
+			os.Exit(1)
 			return
 		}
 
 		json, err := parser.ParseToJson(absPath, prettyPrint, slim, stats, isGzip)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
 			return
 		}
 		if !quiet {
@@ -48,6 +51,7 @@ var parseCmd = &cobra.Command{
 			err = os.WriteFile(outputPath, []byte(json), 0644)
 			if err != nil {
 				fmt.Printf("Error writing to file: %v\n", err)
+				os.Exit(1)
 				return
 			}
 		}
