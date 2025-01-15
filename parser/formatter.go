@@ -330,12 +330,28 @@ func getMinorGods(playerNum int, commandList *[]GameCommand, techTreeRootNode *X
 }
 
 func getEAPM(playerNum int, commandList *[]GameCommand, gameLengthSecs float64) float64 {
-	actions := 0
+	// Track whether we've counted an action for each timestamp+command type combination
+	type actionKey struct {
+		timestamp   float64
+		commandType int
+	}
+	actionsByTimestamp := make(map[actionKey]bool)
+
 	for _, command := range *commandList {
 		if command.PlayerId() == playerNum && command.AffectsEAPM() {
-			actions += 1
+			key := actionKey{
+				timestamp:   command.GameTimeSecs(),
+				commandType: command.CommandType(),
+			}
+			// Only count one action per timestamp+command type combination
+			if !actionsByTimestamp[key] {
+				actionsByTimestamp[key] = true
+			}
 		}
 	}
+
+	// Total actions is the number of unique timestamp+command type combinations
+	actions := len(actionsByTimestamp)
 
 	gameLengthMins := gameLengthSecs / 60.0
 	return float64(actions) / gameLengthMins
