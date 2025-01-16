@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -37,13 +36,13 @@ func formatRawDataToReplay(
 		return ReplayFormatted{}, err
 	}
 
-	losingPlayer, err := getLosingPlayer(commandList)
-	slog.Debug("Losing player", "losingPlayer", losingPlayer)
+	losingTeams, err := getLosingTeams(commandList, profileKeys)
+	slog.Debug("Losing teams", "losingTeams", losingTeams)
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
 	gameLengthSecs := (*commandList)[len(*commandList)-1].GameTimeSecs()
-	players := getPlayers(profileKeys, &majorGodMap, losingPlayer, gameLengthSecs, commandList, &techTreeRootNode)
+	players := getPlayers(profileKeys, &majorGodMap, losingTeams, gameLengthSecs, commandList, &techTreeRootNode)
 	slog.Debug("Game host time", "gameHostTime", (*profileKeys)["gamehosttime"])
 
 	// Find winning team by filtering for winners and taking first player's team
@@ -216,14 +215,40 @@ func formatCommandsToReplayFormat(
 	return replayCommands
 }
 
-func getLosingPlayer(commandList *[]GameCommand) (int, error) {
-	// TODO: Make this robust to team games, right now this assumes a 1v1 game, determine the losing player based on
-	// the last command in the command list, which is, at the moment, always a resign command
-	lastCommand := (*commandList)[len(*commandList)-1]
-	if lastCommand.CommandType() != 16 {
-		return -1, errors.New("last command is not a resign command")
+func getLosingTeams(commandList *[]GameCommand, profileKeys *map[string]ProfileKey) (map[int]bool, error) {
+	// Gets all resign commands and returns the set of team ids of the players who resigned
+	resigningPlayers := make(map[int]bool)
+
+	// Find all players who issued resign commands
+	for _, command := range *commandList {
+		if command.CommandType() == 16 { // 16 is resign command type
+			resigningPlayers[command.PlayerId()] = true
+		}
 	}
-	return lastCommand.PlayerId(), nil
+
+	// If no one resigned, return error
+	if len(resigningPlayers) == 0 {
+		return nil, fmt.Errorf("no resign commands found")
+	}
+
+	// Use a map to deduplicate team IDs
+	teamIds := make(map[int]bool)
+
+	// Get team IDs for all resigning players
+	for playerId := range resigningPlayers {
+		playerPrefix := fmt.Sprintf("gameplayer%d", playerId)
+		teamIdKey := fmt.Sprintf("%steamid", playerPrefix)
+
+		if teamId, ok := (*profileKeys)[teamIdKey]; ok {
+			teamIds[int(teamId.Int32Val)] = true
+		}
+	}
+
+	if len(teamIds) == 0 {
+		return nil, fmt.Errorf("could not find team IDs for resigning players")
+	}
+
+	return teamIds, nil
 }
 
 func buildGodMap(godRootNode *XmbNode) map[int]string {
@@ -247,7 +272,7 @@ func buildGodMap(godRootNode *XmbNode) map[int]string {
 func getPlayers(
 	profileKeys *map[string]ProfileKey,
 	majorGodMap *map[int]string,
-	losingPlayer int,
+	losingTeams map[int]bool,
 	gameLengthSecs float64,
 	commandList *[]GameCommand,
 	techTreeRootNode *XmbNode,
@@ -261,6 +286,7 @@ func getPlayers(
 			keys := *profileKeys
 			playerPrefix := fmt.Sprintf("gameplayer%d", playerNum)
 			profileId, err := strconv.Atoi(keys[fmt.Sprintf("%srlinkid", playerPrefix)].StringVal)
+			teamId := int(keys[fmt.Sprintf("%steamid", playerPrefix)].Int32Val)
 			if err != nil {
 				slog.Error("Error parsing profile id", "error", err)
 				continue
@@ -269,14 +295,14 @@ func getPlayers(
 			eAPM := getEAPM(playerNum, commandList, gameLengthSecs)
 			players = append(players, ReplayPlayer{
 				PlayerNum: playerNum,
-				TeamId:    int(keys[fmt.Sprintf("%steamid", playerPrefix)].Int32Val),
+				TeamId:    teamId,
 				Name:      keys[fmt.Sprintf("%sname", playerPrefix)].StringVal,
 				ProfileId: profileId,
 				Color:     int(keys[fmt.Sprintf("%scolor", playerPrefix)].Int32Val),
 				RandomGod: keys[fmt.Sprintf("%scivwasrandom", playerPrefix)].BoolVal,
 				God:       (*majorGodMap)[int(keys[fmt.Sprintf("%sciv", playerPrefix)].Int32Val)],
 				// TODO: Make this robust to team games, right now this assumes a 1v1 game
-				Winner:    playerNum != losingPlayer,
+				Winner:    !losingTeams[teamId],
 				EAPM:      eAPM,
 				MinorGods: minorGods,
 			})
@@ -332,7 +358,7 @@ func getMinorGods(playerNum int, commandList *[]GameCommand, techTreeRootNode *X
 func getEAPM(playerNum int, commandList *[]GameCommand, gameLengthSecs float64) float64 {
 	// Track whether we've counted an action for each timestamp+command type combination
 	type actionKey struct {
-		timestamp   float64
+		timestamp   int
 		commandType int
 	}
 	actionsByTimestamp := make(map[actionKey]bool)
@@ -340,7 +366,7 @@ func getEAPM(playerNum int, commandList *[]GameCommand, gameLengthSecs float64) 
 	for _, command := range *commandList {
 		if command.PlayerId() == playerNum && command.AffectsEAPM() {
 			key := actionKey{
-				timestamp:   command.GameTimeSecs(),
+				timestamp:   int(command.GameTimeSecs()),
 				commandType: command.CommandType(),
 			}
 			// Only count one action per timestamp+command type combination

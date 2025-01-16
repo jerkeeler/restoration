@@ -197,6 +197,7 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 		inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt8}
 		byteLength := 0
 		for _, f := range inputTypes {
+			slog.Debug("resign", "f", readUint32(data, baseCommand.offset+byteLength))
 			byteLength += f()
 		}
 		baseCommand.affectsEAPM = false
@@ -513,6 +514,7 @@ func findFooterOffset(data *[]byte, offset int) (int, error) {
 
 	unk := derefedData[offset]
 	if unk != 1 {
+		slog.Debug("unk not equal to 1", "unk", unk)
 		return -1, UnkNotEqualTo1Error(offset)
 	}
 
@@ -591,6 +593,7 @@ func parseCommandList(data *[]byte, offset int, lastCommandListIdx int) (Command
 	// it might work correctly. We'll need a smarter way to determine the end of the command stream.
 	for _, cmd := range commands {
 		if cmd.CommandType() == 16 {
+			slog.Debug("Resign command issued", "cmd", cmd)
 			// Resign command issued, return the command list
 			return CommandList{
 				-1,
@@ -644,7 +647,7 @@ func parseGameCommand(data *[]byte, offset int, lastCommandListIdx int) (GameCom
 	three := readUint32(data, offset)
 	offset += 4
 	if three != uint32(3) {
-		return BaseCommand{}, fmt.Errorf("expecting three while parsing game command, three=%v", three)
+		return BaseCommand{}, fmt.Errorf("expecting three while parsing game command %v, three=%v", commandType, three)
 	}
 
 	playerId := -1
