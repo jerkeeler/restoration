@@ -248,6 +248,8 @@ type ReplayPlayer struct {
 	Winner    bool
 	EAPM      float64
 	MinorGods [3]string
+	Titan     bool
+	Wonder    bool
 }
 
 type ReplayGameCommand struct {

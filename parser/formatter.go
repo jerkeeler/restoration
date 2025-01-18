@@ -56,26 +56,24 @@ func formatRawDataToReplay(
 
 	gameOptions := getGameOptions(profileKeys)
 	var gameCommands []ReplayGameCommand
-	if !slim {
-		protoRootNode, err := parseXmb(data, (*xmbMap)["proto"])
-		if err != nil {
-			return ReplayFormatted{}, err
-		}
-		powersRootNode, err := parseXmb(data, (*xmbMap)["powers"])
-		if err != nil {
-			return ReplayFormatted{}, err
-		}
-
-		gameCommands = formatCommandsToReplayFormat(
-			commandList,
-			&players,
-			&techTreeRootNode,
-			&protoRootNode,
-			&powersRootNode,
-		)
+	protoRootNode, err := parseXmb(data, (*xmbMap)["proto"])
+	if err != nil {
+		return ReplayFormatted{}, err
 	}
+	powersRootNode, err := parseXmb(data, (*xmbMap)["powers"])
+	if err != nil {
+		return ReplayFormatted{}, err
+	}
+	gameCommands = formatCommandsToReplayFormat(
+		commandList,
+		&players,
+		&techTreeRootNode,
+		&protoRootNode,
+		&powersRootNode,
+	)
+	addTechsToPlayers(&players, &gameCommands)
 
-	return ReplayFormatted{
+	formattedReplay := ReplayFormatted{
 		MapName:        (*profileKeys)["gamemapname"].StringVal,
 		BuildNumber:    buildNumber,
 		BuildString:    buildString,
@@ -86,8 +84,12 @@ func formatRawDataToReplay(
 		WinningTeam:    winningTeam,
 		GameOptions:    gameOptions,
 		Players:        players,
-		GameCommands:   gameCommands,
-	}, nil
+	}
+	if !slim {
+		formattedReplay.GameCommands = gameCommands
+	}
+
+	return formattedReplay, nil
 }
 
 func readBuildString(data *[]byte, node Node) (string, error) {
@@ -424,4 +426,29 @@ func getGameOptions(profileKeys *map[string]ProfileKey) map[string]bool {
 		gameOptions[key] = (*profileKeys)[key].BoolVal
 	}
 	return gameOptions
+}
+
+func addTechsToPlayers(players *[]ReplayPlayer, gameCommands *[]ReplayGameCommand) {
+	slog.Debug("Adding techs to players")
+	playerTechs := make(map[int][]string)
+	for _, command := range *gameCommands {
+		if command.CommandType == "godPower" && command.Value == "TitanGate" {
+			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Value)
+		} else if command.CommandType == "build" && strings.Contains(strings.ToLower(command.Value), "wonder") {
+			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], "wonder")
+		}
+	}
+
+	// Use index-based iteration to modify the actual players
+	for i := range *players {
+		for _, tech := range playerTechs[(*players)[i].PlayerNum] {
+			if tech == "TitanGate" {
+				slog.Debug("Player has TitanGate", "playerNum", (*players)[i].PlayerNum)
+				(*players)[i].Titan = true
+			} else if tech == "wonder" {
+				slog.Debug("Player has Wonder", "playerNum", (*players)[i].PlayerNum)
+				(*players)[i].Wonder = true
+			}
+		}
+	}
 }
