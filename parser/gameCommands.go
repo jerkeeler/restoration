@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 )
 
 // =========================================================================
@@ -455,7 +456,7 @@ var REFINERS = map[int]func(*[]byte, BaseCommand) GameCommand{
 
 func parseGameCommands(data *[]byte, headerEndOffset int) ([]GameCommand, error) {
 	offset := bytes.Index((*data)[headerEndOffset:], FOOTER)
-	slog.Debug("Parsing command list", "offset", headerEndOffset+offset)
+	slog.Debug("Parsing command list", "offset", strconv.FormatInt(int64(headerEndOffset+offset), 16))
 
 	if offset == -1 {
 		return nil, FooterNotFoundError(offset)

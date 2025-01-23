@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,23 +37,24 @@ func ParseToJson(replayPath string, prettyPrint bool, slim bool, stats bool, isG
 // If we do need to add more optimization, all of the recursive functions could easily spin up a go routine to parse its
 // subtree.
 func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatted, error) {
-	data, err := os.ReadFile(replayPath)
+	raw_data, err := os.ReadFile(replayPath)
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
 
 	if isGzip {
-		data, err = DecompressGzip(&data)
+		raw_data, err = DecompressGzip(&raw_data)
 
 		if err != nil {
 			return ReplayFormatted{}, err
 		}
 	}
 
-	data, err = Decompressl33t(&data)
+	data, err := Decompressl33t(&raw_data)
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
+	// saveHex(&data, "decompressed.hex")
 
 	rootNode := parseHeader(&data)
 
@@ -72,8 +74,18 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 		return ReplayFormatted{}, err
 	}
 	// printProfileKeys(profileKeys)
+	// techtreerootnode, err := parseXmb(&data, xmbMap["techtree"])
+	// if err != nil {
+	// 	return ReplayFormatted{}, err
+	// }
+	// for _, child := range techtreerootnode.children {
+	// 	fmt.Println(child.attributes["name"])
+	// }
 
-	commandList, err := parseGameCommands(&data, rootNode.endOffset())
+	svBytes := bytes.Index(raw_data, []byte{0x73, 0x76}) // search for index of the "sv" bytes
+	commandOffset := readUint32(&raw_data, svBytes+2)
+	slog.Debug("commandOffset", "commandOffset", commandOffset)
+	commandList, err := parseGameCommands(&raw_data, int(commandOffset))
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
@@ -208,4 +220,19 @@ func printProfileKeys(profileKeys map[string]ProfileKey) {
 		}
 		slog.Debug(log)
 	}
+}
+
+func saveHex(data *[]byte, filename string) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Write(*data)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

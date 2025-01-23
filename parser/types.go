@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -74,9 +75,9 @@ func (node Node) getChildren(path ...string) []Node {
 
 func (node Node) String() string {
 	return node.path() + fmt.Sprintf(
-		" -- offset=%d end_offset=%d size=%d children=%d",
-		node.offset,
-		node.endOffset(),
+		" -- offset=%s end_offset=%s size=%d children=%d",
+		strconv.FormatInt(int64(node.offset), 16),
+		strconv.FormatInt(int64(node.endOffset()), 16),
 		node.size,
 		len(node.children),
 	)

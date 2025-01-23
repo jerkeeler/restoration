@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
+	"strconv"
 	"unicode/utf16"
 )
 
@@ -70,12 +72,15 @@ func Decompressl33t(compressed_array *[]byte) ([]byte, error) {
 		Decompresses a l33t compressed byte stream. The header must l33t, then the following bytes are decompressed
 		using the zlib compression.
 	*/
-	header := string((*compressed_array)[:4])
+	offset := bytes.Index(*compressed_array, []byte{0x6c, 0x33, 0x33, 0x74}) // Find the l33t header
+	header := string((*compressed_array)[offset : offset+4])
 	if header != "l33t" {
 		return nil, NotL33t(fmt.Sprintf("Data is no l33t compressed, incorrect header: \"%s\"", header))
 	}
+	slog.Debug("compressed_size", "compressed_size", strconv.FormatInt(int64(len(*compressed_array)), 16))
+	slog.Debug("Decompressing l33t compressed data", "header", header)
 
-	reader, err := zlib.NewReader(bytes.NewReader((*compressed_array)[8:]))
+	reader, err := zlib.NewReader(bytes.NewReader((*compressed_array)[offset+8:]))
 	defer reader.Close()
 	if err != nil {
 		return nil, err

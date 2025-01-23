@@ -5,7 +5,7 @@ import (
 )
 
 func parseHeader(data *[]byte) Node {
-	rootNode := newNode(data, OUTER_HIERARCHY_START_OFFSET)
+	rootNode := newNode(data, 0)
 	slog.Debug("Parsing header tree")
 	parseTree(data, &rootNode)
 	// printTree(rootNode)
