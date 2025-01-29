@@ -102,91 +102,11 @@ func (node NotRootNodeError) Error() string {
 	return errString
 }
 
-// ===============================
-// GameCommand types
-// ===============================
-
-type GameCommand interface {
-	CommandType() int
-	OffsetEnd() int
-	PlayerId() int
-	ByteLength() int
-	GameTimeSecs() float64
-	AffectsEAPM() bool
-}
-
-type BaseCommand struct {
-	commandType  int
-	playerId     int
-	offset       int
-	offsetEnd    int
-	byteLength   int
-	gameTimeSecs float64
-	affectsEAPM  bool
-}
-
-func (cmd BaseCommand) CommandType() int {
-	return cmd.commandType
-}
-
-func (cmd BaseCommand) OffsetEnd() int {
-	return cmd.offsetEnd
-}
-
-func (cmd BaseCommand) PlayerId() int {
-	return cmd.playerId
-}
-
-func (cmd BaseCommand) ByteLength() int {
-	return cmd.byteLength
-}
-
-func (cmd BaseCommand) GameTimeSecs() float64 {
-	return cmd.gameTimeSecs
-}
-
-func (cmd BaseCommand) AffectsEAPM() bool {
-	return cmd.affectsEAPM
-}
-
-type ResearchCommand struct {
-	BaseCommand
-	techId int32
-}
-
-type PrequeueTechCommand struct {
-	BaseCommand
-	techId int32
-}
-
-type TrainCommand struct {
-	BaseCommand
-	protoUnitId int32
-	numUnits    int8
-}
-
-type AutoqueueCommand struct {
-	BaseCommand
-	protoUnitId int32
-}
-
-type BuildCommand struct {
-	BaseCommand
-	protoBuildingId int32
-	queued          bool
-	location        Vector3
-}
-
-type ProtoPowerCommand struct {
-	BaseCommand
-	protoPowerId int32
-}
-
 type CommandList struct {
 	entryIdx     int
 	offsetEnd    int
 	finalCommand bool
-	commands     []GameCommand
+	commands     []RawGameCommand
 }
 
 type FooterNotFoundError int

@@ -233,7 +233,8 @@ Game commands will be a long list that looks like the following when not in slim
 
 ## Roadmap
 
-- [ ] Add support for team games
+- [x] Add support for team games
+  - Sort of done, but half baked
 - [ ] Add refiners for all command types
 - [ ] Add stats calculation
 - [ ] Add testing

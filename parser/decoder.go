@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"strconv"
 	"unicode/utf16"
 )
@@ -26,6 +27,11 @@ func readUint32(data *[]byte, offset int) uint32 {
 
 func readInt32(data *[]byte, offset int) int32 {
 	return int32(readUint32(data, offset))
+}
+
+func readFloat(data *[]byte, offset int) float32 {
+	bits := readUint32(data, offset)
+	return math.Float32frombits(bits)
 }
 
 func readBool(data *[]byte, offset int) bool {

@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+var FORMATTERS = map[int]func(FormatterInput, ReplayGameCommand, RawGameCommand) ReplayGameCommand{
+	1: func(xmbNodes FormatterInput, baseReplayCommand ReplayGameCommand, command RawGameCommand) ReplayGameCommand {
+		researchCommand := command.(ResearchCommand)
+		baseReplayCommand.CommandType = "research"
+		baseReplayCommand.Value = xmbNodes.techTreeRootNode.children[researchCommand.techId].attributes["name"]
+		return baseReplayCommand
+	},
+}
+
 func formatRawDataToReplay(
 	slim bool,
 	stats bool,
@@ -15,7 +24,7 @@ func formatRawDataToReplay(
 	rootNode *Node,
 	profileKeys *map[string]ProfileKey,
 	xmbMap *map[string]XmbFile,
-	commandList *[]GameCommand,
+	commandList *[]RawGameCommand,
 ) (ReplayFormatted, error) {
 
 	buildString, err := readBuildString(data, *rootNode)
@@ -129,7 +138,7 @@ func getBuildNumber(buildString string) int {
 }
 
 func formatCommandsToReplayFormat(
-	commandList *[]GameCommand,
+	commandList *[]RawGameCommand,
 	players *[]ReplayPlayer,
 	techTreeRootNode *XmbNode,
 	protoRootNode *XmbNode,
@@ -140,10 +149,23 @@ func formatCommandsToReplayFormat(
 		playerMap[player.PlayerNum] = player
 	}
 	replayCommands := []ReplayGameCommand{}
+	formatterInput := FormatterInput{
+		protoRootNode:    protoRootNode,
+		techTreeRootNode: techTreeRootNode,
+		powersRootNode:   powers,
+	}
 	for _, command := range *commandList {
 		// This is gross, for now, sorry.
 		// TODO: Make this command list formatter better. Should this be a map of command types to formatter functions?
 		// Similar to the refiners? Do I just enrich ReplayGameCommand with all optional fields, such as num units?
+		formatter, ok := FORMATTERS[command.CommandType()]
+		if ok {
+			baseCommand := ReplayGameCommand{
+				GameTimeSecs: command.GameTimeSecs(),
+				PlayerNum:    command.PlayerId(),
+			}
+			replayCommands = append(replayCommands, formatter(formatterInput, baseCommand, command))
+		}
 		if researchCmd, ok := command.(ResearchCommand); ok {
 
 			replayCommands = append(replayCommands, ReplayGameCommand{
@@ -217,7 +239,7 @@ func formatCommandsToReplayFormat(
 	return replayCommands
 }
 
-func getLosingTeams(commandList *[]GameCommand, profileKeys *map[string]ProfileKey) (map[int]bool, error) {
+func getLosingTeams(commandList *[]RawGameCommand, profileKeys *map[string]ProfileKey) (map[int]bool, error) {
 	// Gets all resign commands and returns the set of team ids of the players who resigned
 	resigningPlayers := make(map[int]bool)
 
@@ -276,7 +298,7 @@ func getPlayers(
 	majorGodMap *map[int]string,
 	losingTeams map[int]bool,
 	gameLengthSecs float64,
-	commandList *[]GameCommand,
+	commandList *[]RawGameCommand,
 	techTreeRootNode *XmbNode,
 ) []ReplayPlayer {
 	// Create a players slice, but checking if each player number exists in the profile keys. If it does, grab
@@ -319,7 +341,7 @@ func playerExists(profileKeys *map[string]ProfileKey, playerNum int) bool {
 	return (*profileKeys)[playerKey].StringVal != ""
 }
 
-func getMinorGods(playerNum int, commandList *[]GameCommand, techTreeRootNode *XmbNode) [3]string {
+func getMinorGods(playerNum int, commandList *[]RawGameCommand, techTreeRootNode *XmbNode) [3]string {
 	// Filter to all Research/prequeue techs that are Age Up tech,
 	ageUpTechs := []string{}
 	for _, command := range *commandList {
@@ -357,7 +379,7 @@ func getMinorGods(playerNum int, commandList *[]GameCommand, techTreeRootNode *X
 	return [3]string{classical, heroic, mythic}
 }
 
-func getEAPM(playerNum int, commandList *[]GameCommand, gameLengthSecs float64) float64 {
+func getEAPM(playerNum int, commandList *[]RawGameCommand, gameLengthSecs float64) float64 {
 	// Track whether we've counted an action for each timestamp+command type combination
 	actions := 0
 
@@ -434,8 +456,8 @@ func addTechsToPlayers(players *[]ReplayPlayer, gameCommands *[]ReplayGameComman
 	for _, command := range *gameCommands {
 		if command.CommandType == "godPower" && command.Value == "TitanGate" {
 			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Value)
-		} else if command.CommandType == "build" && strings.Contains(strings.ToLower(command.Value), "wonder") {
-			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], "wonder")
+		} else if command.CommandType == "build" && command.Value == "Wonder" {
+			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Value)
 		}
 	}
 
@@ -445,7 +467,7 @@ func addTechsToPlayers(players *[]ReplayPlayer, gameCommands *[]ReplayGameComman
 			if tech == "TitanGate" {
 				slog.Debug("Player has TitanGate", "playerNum", (*players)[i].PlayerNum)
 				(*players)[i].Titan = true
-			} else if tech == "wonder" {
+			} else if tech == "Wonder" {
 				slog.Debug("Player has Wonder", "playerNum", (*players)[i].PlayerNum)
 				(*players)[i].Wonder = true
 			}
