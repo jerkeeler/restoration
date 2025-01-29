@@ -23,12 +23,6 @@ var parseCmd = &cobra.Command{
 	Long:  `Parses .mythrec files to human-readable json`,
 	Args:  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
-		if stats && slim {
-			fmt.Fprintf(os.Stderr, "error: you cannot use stats and slim mode together\n")
-			os.Exit(1)
-			return
-		}
-
 		absPath, err := validateAndExpandPath(args[0])
 		if err != nil {
 			fmt.Printf("Error with filepath: %v\n", err)
