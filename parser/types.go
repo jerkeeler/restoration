@@ -155,6 +155,7 @@ type ReplayFormatted struct {
 	WinningTeam    int
 	GameOptions    map[string]bool
 	Players        []ReplayPlayer
+	Stats          *map[int]ReplayStats // Map of player number to stats
 	GameCommands   *[]ReplayGameCommand
 }
 
@@ -178,4 +179,37 @@ type ReplayGameCommand struct {
 	PlayerNum    int
 	CommandType  string
 	Payload      interface{}
+}
+
+type ReplayStats struct {
+	Trade           TradeStats
+	UnitCounts      map[string]int
+	BuildingCounts  map[string]int
+	GodPowerCounts  map[string]int
+	TechsResearched []string
+	EAPM            []float64
+	Timelines       Timelines
+}
+
+type TradeStats struct {
+	ResourcesSold   map[string]float32
+	ResourcesBought map[string]float32
+}
+
+type TechItem struct {
+	Name         string
+	GameTimeSecs float64
+}
+
+type GodPowerItem struct {
+	Name         string
+	GameTimeSecs float64
+}
+
+type Timelines struct {
+	UnitCounts      []map[string]int
+	BuildingCounts  []map[string]int
+	TechsPrequeued  []TechItem
+	TechsResearched []TechItem
+	GodPowers       []GodPowerItem
 }

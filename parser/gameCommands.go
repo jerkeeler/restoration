@@ -491,16 +491,18 @@ func (cmd BuySellResourcesCommand) Refine(baseCommand *BaseCommand, data *[]byte
 	}
 }
 
+type BuySellResourcesPayload struct {
+	ResourceType string
+	Action       string
+	Quantity     float32
+}
+
 func (cmd BuySellResourcesCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
 	return ReplayGameCommand{
 		GameTimeSecs: cmd.GameTimeSecs(),
 		PlayerNum:    cmd.PlayerId(),
 		CommandType:  "marketBuySell",
-		Payload: struct {
-			ResourceType string
-			Action       string
-			Quantity     float32
-		}{
+		Payload: BuySellResourcesPayload{
 			ResourceType: string(cmd.resourceType),
 			Action:       string(cmd.action),
 			Quantity:     cmd.quantity,

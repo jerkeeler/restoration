@@ -88,6 +88,9 @@ func formatRawDataToReplay(
 	if !slim {
 		formattedReplay.GameCommands = &gameCommands
 	}
+	if stats {
+		formattedReplay.Stats = calcStats(&gameCommands, commandList)
+	}
 
 	return formattedReplay, nil
 }
