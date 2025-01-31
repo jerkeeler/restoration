@@ -155,7 +155,7 @@ type ReplayFormatted struct {
 	WinningTeam    int
 	GameOptions    map[string]bool
 	Players        []ReplayPlayer
-	GameCommands   []ReplayGameCommand
+	GameCommands   *[]ReplayGameCommand
 }
 
 type ReplayPlayer struct {

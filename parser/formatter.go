@@ -86,7 +86,7 @@ func formatRawDataToReplay(
 		Players:        players,
 	}
 	if !slim {
-		formattedReplay.GameCommands = gameCommands
+		formattedReplay.GameCommands = &gameCommands
 	}
 
 	return formattedReplay, nil
