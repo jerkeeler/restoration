@@ -8,7 +8,15 @@ import (
 	"strconv"
 )
 
-func newBaseCommand(offset int, commandType int, playerId int, lastCommandListIdx int) BaseCommand {
+func newBaseCommand(
+	offset int,
+	commandType int,
+	playerId int,
+	lastCommandListIdx int,
+	sourceUnits *[]uint32,
+	sourceVectors *[]Vector3,
+	preArgumentBytes *[]uint8,
+) BaseCommand {
 	cmd := BaseCommand{
 		offset:      offset,
 		commandType: commandType,
@@ -16,8 +24,11 @@ func newBaseCommand(offset int, commandType int, playerId int, lastCommandListId
 		// Set the game time to seconds, but using the index of the command list. Command lists occur every 1/20 of a second.
 		// Basically, the game ticks every 1/20 of a second and batches commands that occur in between into one command list
 		// so we can use the index of the command list to get the game time.
-		gameTimeSecs: float64(lastCommandListIdx) / 20.0,
-		affectsEAPM:  true,
+		gameTimeSecs:     float64(lastCommandListIdx) / 20.0,
+		affectsEAPM:      true,
+		sourceUnits:      sourceUnits,
+		sourceVectors:    sourceVectors,
+		preArgumentBytes: preArgumentBytes,
 	}
 	return cmd
 }
@@ -246,24 +257,25 @@ func parseGameCommand(data *[]byte, offset int, lastCommandListIdx int) (RawGame
 	numUnits := readUint16(data, offset)
 	offset += 4
 
-	// TODO: Use sourceUnits for something?
-	// sourceUnits := make([]uint16, numUnits)
+	sourceUnits := make([]uint32, numUnits)
 	for i := 0; i < int(numUnits); i++ {
-		// sourceUnits = append(sourceUnits, readUint16(data, offset))
+		sourceUnits[i] = readUint32(data, offset)
 		offset += 4
 	}
 
 	numVectors := readUint16(data, offset)
 	offset += 4
+	sourceVectors := make([]Vector3, numVectors)
 	for i := 0; i < int(numVectors); i++ {
-		// TODO: parse vectors
+		sourceVectors[i] = readVector(data, offset)
 		offset += 12
 	}
 
 	numPreArgumentBytes := 13 + readUint16(data, offset)
 	offset += 4
+	preArgumentBytes := make([]uint8, numPreArgumentBytes)
 	for i := 0; i < int(numPreArgumentBytes); i++ {
-		// TODO: Do something with prearugment bytes
+		preArgumentBytes[i] = derefedData[offset+i]
 	}
 	offset += int(numPreArgumentBytes)
 
@@ -272,8 +284,16 @@ func parseGameCommand(data *[]byte, offset int, lastCommandListIdx int) (RawGame
 		return BaseCommand{}, fmt.Errorf("refiner not defined for commandType=%v", commandType)
 	}
 
-	baseCmd := newBaseCommand(offset, commandType, playerId, lastCommandListIdx)
-	gameCommand := refiner(baseCmd, data)
+	baseCmd := newBaseCommand(
+		offset,
+		commandType,
+		playerId,
+		lastCommandListIdx,
+		&sourceUnits,
+		&sourceVectors,
+		&preArgumentBytes,
+	)
+	gameCommand := refiner(&baseCmd, data)
 	offset += gameCommand.ByteLength()
 
 	// slog.Debug(fmt.Sprintf("Parsing game command with type=%v for player playerId=%v", commandType, playerId))
