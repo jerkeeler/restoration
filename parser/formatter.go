@@ -8,15 +8,6 @@ import (
 	"time"
 )
 
-var FORMATTERS = map[int]func(FormatterInput, ReplayGameCommand, RawGameCommand) ReplayGameCommand{
-	1: func(xmbNodes FormatterInput, baseReplayCommand ReplayGameCommand, command RawGameCommand) ReplayGameCommand {
-		researchCommand := command.(ResearchCommand)
-		baseReplayCommand.CommandType = "research"
-		baseReplayCommand.Value = xmbNodes.techTreeRootNode.children[researchCommand.techId].attributes["name"]
-		return baseReplayCommand
-	},
-}
-
 func formatRawDataToReplay(
 	slim bool,
 	stats bool,
@@ -148,88 +139,16 @@ func formatCommandsToReplayFormat(
 	for _, player := range *players {
 		playerMap[player.PlayerNum] = player
 	}
-	replayCommands := []ReplayGameCommand{}
+	var replayCommands []ReplayGameCommand
 	formatterInput := FormatterInput{
 		protoRootNode:    protoRootNode,
 		techTreeRootNode: techTreeRootNode,
 		powersRootNode:   powers,
 	}
 	for _, command := range *commandList {
-		// This is gross, for now, sorry.
-		// TODO: Make this command list formatter better. Should this be a map of command types to formatter functions?
-		// Similar to the refiners? Do I just enrich ReplayGameCommand with all optional fields, such as num units?
-		formatter, ok := FORMATTERS[command.CommandType()]
+		formattedCommand, ok := command.Format(formatterInput)
 		if ok {
-			baseCommand := ReplayGameCommand{
-				GameTimeSecs: command.GameTimeSecs(),
-				PlayerNum:    command.PlayerId(),
-			}
-			replayCommands = append(replayCommands, formatter(formatterInput, baseCommand, command))
-		}
-		if researchCmd, ok := command.(ResearchCommand); ok {
-
-			replayCommands = append(replayCommands, ReplayGameCommand{
-				GameTimeSecs: command.GameTimeSecs(),
-				CommandType:  "research",
-				Value:        techTreeRootNode.children[researchCmd.techId].attributes["name"],
-				PlayerNum:    researchCmd.playerId,
-			})
-		}
-
-		if prequeueTechCmd, ok := command.(PrequeueTechCommand); ok {
-			replayCommands = append(replayCommands, ReplayGameCommand{
-				GameTimeSecs: command.GameTimeSecs(),
-				CommandType:  "prequeueTech",
-				Value:        techTreeRootNode.children[prequeueTechCmd.techId].attributes["name"],
-				PlayerNum:    prequeueTechCmd.playerId,
-			})
-		}
-
-		if trainCmd, ok := command.(TrainCommand); ok {
-			proto := protoRootNode.children[trainCmd.protoUnitId].attributes["name"]
-			replayCommands = append(replayCommands, ReplayGameCommand{
-				GameTimeSecs: command.GameTimeSecs(),
-				CommandType:  "train",
-				Value:        proto,
-				PlayerNum:    trainCmd.playerId,
-			})
-		}
-
-		if autoqueueCmd, ok := command.(AutoqueueCommand); ok {
-			proto := protoRootNode.children[autoqueueCmd.protoUnitId].attributes["name"]
-			replayCommands = append(replayCommands, ReplayGameCommand{
-				GameTimeSecs: command.GameTimeSecs(),
-				CommandType:  "autoqueue",
-				Value:        proto,
-				PlayerNum:    autoqueueCmd.playerId,
-			})
-		}
-
-		if buildCmd, ok := command.(BuildCommand); ok {
-			proto := protoRootNode.children[buildCmd.protoBuildingId].attributes["name"]
-			replayCommands = append(replayCommands, ReplayGameCommand{
-				GameTimeSecs: command.GameTimeSecs(),
-				CommandType:  "build",
-				Value:        proto,
-				PlayerNum:    buildCmd.playerId,
-			})
-		}
-
-		if godPowerCmd, ok := command.(ProtoPowerCommand); ok {
-			power := powers.children[godPowerCmd.protoPowerId]
-			var commandType string
-			if _, ok := power.attributes["godpower"]; ok {
-				commandType = "godPower"
-			} else {
-				commandType = "protoPower"
-			}
-
-			replayCommands = append(replayCommands, ReplayGameCommand{
-				GameTimeSecs: command.GameTimeSecs(),
-				CommandType:  commandType,
-				Value:        power.attributes["name"],
-				PlayerNum:    godPowerCmd.playerId,
-			})
+			replayCommands = append(replayCommands, formattedCommand)
 		}
 	}
 	if len(*commandList) > 0 {
@@ -452,12 +371,12 @@ func getGameOptions(profileKeys *map[string]ProfileKey) map[string]bool {
 
 func addTechsToPlayers(players *[]ReplayPlayer, gameCommands *[]ReplayGameCommand) {
 	slog.Debug("Adding techs to players")
-	playerTechs := make(map[int][]string)
+	playerTechs := make(map[int][]interface{})
 	for _, command := range *gameCommands {
-		if command.CommandType == "godPower" && command.Value == "TitanGate" {
-			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Value)
-		} else if command.CommandType == "build" && command.Value == "Wonder" {
-			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Value)
+		if command.CommandType == "godPower" && command.Payload == "TitanGate" {
+			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Payload)
+		} else if command.CommandType == "build" && command.Payload == "Wonder" {
+			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Payload)
 		}
 	}
 

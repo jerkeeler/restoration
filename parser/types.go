@@ -175,7 +175,7 @@ type ReplayPlayer struct {
 
 type ReplayGameCommand struct {
 	GameTimeSecs float64
-	CommandType  string
 	PlayerNum    int
-	Value        string
+	CommandType  string
+	Payload      interface{}
 }
