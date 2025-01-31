@@ -288,12 +288,19 @@ func (cmd BuildCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCo
 	// protoUnitId comes from the 3rd int32 in the command
 	protoBuildingId := readInt32(data, baseCommand.offset+8)
 	location := readVector(data, baseCommand.offset+12)
+	queued := (*baseCommand.preArgumentBytes)[0]&2 != 0
 	return BuildCommand{
 		BaseCommand:     *baseCommand,
 		protoBuildingId: protoBuildingId,
 		location:        location,
-		queued:          false,
+		queued:          queued,
 	}
+}
+
+type BuildCommandPaylod struct {
+	Name     string
+	Location Vector3
+	Queued   bool
 }
 
 func (cmd BuildCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
@@ -302,7 +309,11 @@ func (cmd BuildCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
 		GameTimeSecs: cmd.GameTimeSecs(),
 		PlayerNum:    cmd.PlayerId(),
 		CommandType:  "build",
-		Payload:      proto,
+		Payload: BuildCommandPaylod{
+			Name:     proto,
+			Location: cmd.location,
+			Queued:   cmd.queued,
+		},
 	}, true
 }
 
@@ -323,9 +334,7 @@ func (cmd SetGatherPointCommand) Refine(baseCommand *BaseCommand, data *[]byte) 
 	enrichBaseCommand(baseCommand, byteLength)
 	// Currently this command triggers a Task subtype move command immediately afterwards, so we don't want to double count
 	baseCommand.affectsEAPM = false
-	return SetGatherPointCommand{
-		BaseCommand: *baseCommand,
-	}
+	return SetGatherPointCommand{*baseCommand}
 }
 
 // ========================================================================
@@ -343,9 +352,7 @@ func (cmd DeleteCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameC
 		byteLength += f()
 	}
 	enrichBaseCommand(baseCommand, byteLength)
-	return DeleteCommand{
-		BaseCommand: *baseCommand,
-	}
+	return DeleteCommand{*baseCommand}
 }
 
 // ========================================================================
@@ -363,9 +370,7 @@ func (cmd StopCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCom
 		byteLength += f()
 	}
 	enrichBaseCommand(baseCommand, byteLength)
-	return StopCommand{
-		BaseCommand: *baseCommand,
-	}
+	return StopCommand{*baseCommand}
 }
 
 // ========================================================================
@@ -375,6 +380,8 @@ func (cmd StopCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCom
 type ProtoPowerCommand struct {
 	BaseCommand
 	protoPowerId int32
+	location1    Vector3
+	location2    Vector3
 }
 
 func (cmd ProtoPowerCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
@@ -390,10 +397,20 @@ func (cmd ProtoPowerCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawG
 	byteLength := 57
 	enrichBaseCommand(baseCommand, byteLength)
 	protoPowerId := readInt32(data, baseCommand.offset+52)
+	location1 := readVector(data, baseCommand.offset+12)
+	location2 := readVector(data, baseCommand.offset+24)
 	return ProtoPowerCommand{
 		BaseCommand:  *baseCommand,
 		protoPowerId: protoPowerId,
+		location1:    location1,
+		location2:    location2,
 	}
+}
+
+type ProtoPowerPayload struct {
+	Name      string
+	Location1 Vector3
+	Location2 Vector3
 }
 
 func (cmd ProtoPowerCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
@@ -408,7 +425,11 @@ func (cmd ProtoPowerCommand) Format(input FormatterInput) (ReplayGameCommand, bo
 		GameTimeSecs: cmd.GameTimeSecs(),
 		PlayerNum:    cmd.PlayerId(),
 		CommandType:  commandType,
-		Payload:      power.attributes["name"],
+		Payload: ProtoPowerPayload{
+			Name:      power.attributes["name"],
+			Location1: cmd.location1,
+			Location2: cmd.location2,
+		},
 	}, true
 }
 
@@ -517,7 +538,7 @@ func (cmd ResignCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameC
 	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt8}
 	byteLength := 0
 	for _, f := range inputTypes {
-		slog.Debug("resign", "f", readUint32(data, baseCommand.offset+byteLength))
+		//slog.Debug("resign", "f", readUint32(data, baseCommand.offset+byteLength))
 		byteLength += f()
 	}
 	enrichBaseCommand(baseCommand, byteLength)
@@ -741,16 +762,29 @@ func (cmd TauntCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
 
 type CheatCommand struct {
 	BaseCommand
+	cheatId int32
 }
 
 func (cmd CheatCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
-	byteLength := 0
-	for _, f := range inputTypes {
-		byteLength += f()
-	}
+	// Cheat command is 16 bytes long, consisting of 4 int32s. The 3rd int32 is the cheatId. Which can be
+	// converted to a string via XMB data
+	byteLength := 16
 	enrichBaseCommand(baseCommand, byteLength)
-	return CheatCommand{*baseCommand}
+	cheatId := readInt32(data, baseCommand.offset+8)
+	return CheatCommand{
+		BaseCommand: *baseCommand,
+		cheatId:     cheatId,
+	}
+}
+
+func (cmd CheatCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
+	// TODO: Look up cheat name in XMB data
+	return ReplayGameCommand{
+		GameTimeSecs: cmd.GameTimeSecs(),
+		PlayerNum:    cmd.PlayerId(),
+		CommandType:  "cheat",
+		Payload:      strconv.Itoa(int(cmd.cheatId)),
+	}, true
 }
 
 // ========================================================================
@@ -777,16 +811,40 @@ func (cmd CancelQueuedItemCommand) Refine(baseCommand *BaseCommand, data *[]byte
 
 type SetFormationCommand struct {
 	BaseCommand
+	formation string
 }
 
 func (cmd SetFormationCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
-	byteLength := 0
-	for _, f := range inputTypes {
-		byteLength += f()
-	}
+	// The setFormation command is 16 bytes in length, consisting of 4 int32s. The 3rd int32 is the formationId
+	byteLength := 16
 	enrichBaseCommand(baseCommand, byteLength)
-	return SetFormationCommand{*baseCommand}
+	formationId := readInt32(data, baseCommand.offset+8)
+	var formation string
+	switch formationId {
+	case 0:
+		formation = "line"
+	case 1:
+		formation = "box"
+	case 2:
+		formation = "spread"
+	default:
+		formation = "unknown"
+		slog.Warn("Unknown formation", "formationId", formationId)
+	}
+
+	return SetFormationCommand{
+		BaseCommand: *baseCommand,
+		formation:   formation,
+	}
+}
+
+func (cmd SetFormationCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
+	return ReplayGameCommand{
+		GameTimeSecs: cmd.GameTimeSecs(),
+		PlayerNum:    cmd.PlayerId(),
+		CommandType:  "setFormation",
+		Payload:      cmd.formation,
+	}, true
 }
 
 // ========================================================================
@@ -882,16 +940,28 @@ func (cmd ToggleAutoUnitAbilityCommand) Refine(baseCommand *BaseCommand, data *[
 
 type TimeShiftCommand struct {
 	BaseCommand
+	location Vector3
 }
 
 func (cmd TimeShiftCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	inputTypes := []func() int{unpackInt32, unpackInt32, unpackVector, unpackVector}
-	byteLength := 0
-	for _, f := range inputTypes {
-		byteLength += f()
-	}
+	// The timeshift command is 32 bytes in length consisting of 2 int32s and 2 vectors. However, none of these bytes
+	// correspond to the command, instead the location of the timeshift is stored in the sourceVectors
+	byteLength := 32
 	enrichBaseCommand(baseCommand, byteLength)
-	return TimeShiftCommand{*baseCommand}
+	location := (*baseCommand.sourceVectors)[0]
+	return TimeShiftCommand{
+		BaseCommand: *baseCommand,
+		location:    location,
+	}
+}
+
+func (cmd TimeShiftCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
+	return ReplayGameCommand{
+		GameTimeSecs: cmd.GameTimeSecs(),
+		PlayerNum:    cmd.PlayerId(),
+		CommandType:  "timeShift",
+		Payload:      cmd.location,
+	}, true
 }
 
 // ========================================================================

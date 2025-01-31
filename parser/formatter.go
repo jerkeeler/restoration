@@ -373,10 +373,16 @@ func addTechsToPlayers(players *[]ReplayPlayer, gameCommands *[]ReplayGameComman
 	slog.Debug("Adding techs to players")
 	playerTechs := make(map[int][]interface{})
 	for _, command := range *gameCommands {
-		if command.CommandType == "godPower" && command.Payload == "TitanGate" {
-			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Payload)
-		} else if command.CommandType == "build" && command.Payload == "Wonder" {
-			playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], command.Payload)
+		if command.CommandType == "godPower" {
+			payload := command.Payload.(ProtoPowerPayload)
+			if payload.Name == "TitanGate" {
+				playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], payload.Name)
+			}
+		} else if command.CommandType == "build" {
+			payload := command.Payload.(BuildCommandPaylod)
+			if payload.Name == "Wonder" {
+				playerTechs[command.PlayerNum] = append(playerTechs[command.PlayerNum], payload.Name)
+			}
 		}
 	}
 
