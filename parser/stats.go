@@ -235,8 +235,10 @@ func calcEAPMOverTime(rawCommandList *[]RawGameCommand) []float64 {
 	eapm := make([]float64, minutes)
 
 	for _, command := range *rawCommandList {
-		commandMinute := int(math.Ceil(command.GameTimeSecs() / 60.0))
-		eapm[commandMinute-1] += 1
+		if command.AffectsEAPM() {
+			commandMinute := int(math.Ceil(command.GameTimeSecs() / 60.0))
+			eapm[commandMinute-1] += 1
+		}
 	}
 
 	return eapm
