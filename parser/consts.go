@@ -3,7 +3,7 @@ package parser
 const MAX_SCAN_OFFSET = 50
 const DATA_OFFSET = 6
 const ROOT_NODE_TOKEN = "BG"
-const VERSION = "v0.2.0"
+const VERSION = "v0.2.1"
 
 var FOOTER = []uint8{0, 1, 0, 0, 0, 0, 0, 0}
 
