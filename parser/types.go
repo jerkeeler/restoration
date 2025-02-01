@@ -187,6 +187,7 @@ type ReplayStats struct {
 	BuildingCounts  map[string]int
 	GodPowerCounts  map[string]int
 	FormationCounts map[string]int
+	TauntCounts     map[string]int
 	TechsResearched []string
 	EAPM            []float64
 	Timelines       Timelines

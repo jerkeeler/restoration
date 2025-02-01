@@ -57,6 +57,7 @@ func calcStatsForPlayer(playerCommandList *[]ReplayGameCommand, rawPlayerCommand
 		GodPowerCounts:  totals.GodPowerCounts,
 		TechsResearched: totals.TechsResearched,
 		FormationCounts: totals.FormationCounts,
+		TauntCounts:     totals.TauntCounts,
 		EAPM:            calcEAPMOverTime(&rawPlayerCommandList),
 		Timelines:       timelines.Timelines,
 	}
@@ -71,6 +72,7 @@ func calcTotals(playerCommandList *[]ReplayGameCommand) ReplayStats {
 	techsResearched := make([]string, 0)
 	seenTechs := make(map[string]bool)
 	formationCounts := make(map[string]int)
+	tauntCounts := make(map[string]int)
 
 	for _, command := range *playerCommandList {
 		handleMarketBuySell("sell", &command, &resourcesSold)
@@ -79,6 +81,7 @@ func calcTotals(playerCommandList *[]ReplayGameCommand) ReplayStats {
 		handleBuildingCounts(&command, &buildingCounts)
 		handleGodPowerCounts(&command, &godPowerCounts)
 		handleFormationCount(&command, &formationCounts)
+		handleTauntCount(&command, &tauntCounts)
 		techsResearched = techsResearch(&command, techsResearched, &seenTechs)
 	}
 
@@ -92,6 +95,7 @@ func calcTotals(playerCommandList *[]ReplayGameCommand) ReplayStats {
 		GodPowerCounts:  godPowerCounts,
 		FormationCounts: formationCounts,
 		TechsResearched: techsResearched,
+		TauntCounts:     tauntCounts,
 	}
 }
 
@@ -179,6 +183,16 @@ func handleFormationCount(command *ReplayGameCommand, formationCount *map[string
 			(*formationCount)[payload] = 0
 		}
 		(*formationCount)[payload] += 1
+	}
+}
+
+func handleTauntCount(command *ReplayGameCommand, tauntCount *map[string]int) {
+	if command.CommandType == "taunt" {
+		payload := command.Payload.(string)
+		if _, exists := (*tauntCount)[payload]; !exists {
+			(*tauntCount)[payload] = 0
+		}
+		(*tauntCount)[payload] += 1
 	}
 }
 
