@@ -259,7 +259,7 @@ func getPlayers(
 
 func playerExists(profileKeys *map[string]ProfileKey, playerNum int) bool {
 	// If a player's pfentity key is populated in the profile keys, then the player exists.
-	playerKey := fmt.Sprintf("gameplayer%dpfentity", playerNum)
+	playerKey := fmt.Sprintf("gameplayer%dname", playerNum)
 	return (*profileKeys)[playerKey].StringVal != ""
 }
 

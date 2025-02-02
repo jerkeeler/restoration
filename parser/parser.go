@@ -73,7 +73,7 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
-	// printProfileKeys(profileKeys)
+	//printProfileKeys(profileKeys)
 	// techtreerootnode, err := parseXmb(&data, xmbMap["techtree"])
 	// if err != nil {
 	// 	return ReplayFormatted{}, err
