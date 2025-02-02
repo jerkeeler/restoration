@@ -31,7 +31,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		opts := &slog.HandlerOptions{
-			Level: slog.LevelInfo,
+			Level: slog.LevelError,
 		}
 		if verbose {
 			opts.Level = slog.LevelDebug
