@@ -34,7 +34,7 @@ func (cf *CommandFactory) Register(cmdType int, refiner RefineableCommand) {
 	if _, exists := cf.refiners[cmdType]; !exists {
 		cf.refiners[cmdType] = refiner
 	} else {
-		slog.Warn("Command type already registered", "type", cmdType)
+		slog.Debug("Command type already registered", "type", cmdType)
 	}
 }
 
@@ -472,7 +472,7 @@ func (cmd BuySellResourcesCommand) Refine(baseCommand *BaseCommand, data *[]byte
 	} else if resourceId == 2 {
 		resourceType = FoodResource
 	} else {
-		slog.Warn("Unknown resource type", "resourceId", resourceId)
+		slog.Debug("Unknown resource type", "resourceId", resourceId)
 		resourceType = UnknownResource
 	}
 
@@ -831,7 +831,7 @@ func (cmd SetFormationCommand) Refine(baseCommand *BaseCommand, data *[]byte) Ra
 		formation = "spread"
 	default:
 		formation = "unknown"
-		slog.Warn("Unknown formation", "formationId", formationId)
+		slog.Debug("Unknown formation", "formationId", formationId)
 	}
 
 	return SetFormationCommand{
