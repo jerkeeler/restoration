@@ -172,6 +172,7 @@ type ReplayPlayer struct {
 	MinorGods [3]string
 	Titan     bool
 	Wonder    bool
+	CivList   string `json:"civ_list"`
 }
 
 type ReplayGameCommand struct {

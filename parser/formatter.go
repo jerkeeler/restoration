@@ -251,6 +251,7 @@ func getPlayers(
 				Winner:    !losingTeams[teamId],
 				EAPM:      eAPM,
 				MinorGods: minorGods,
+				CivList:   keys[fmt.Sprintf("%scivlist", playerPrefix)].StringVal,
 			})
 		}
 	}
