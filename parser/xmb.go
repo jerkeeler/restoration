@@ -25,7 +25,9 @@ func parseXmbMap(data *[]byte, rootNode Node) (map[string]XmbFile, error) {
 			if numFiles > 1 {
 				// Read two strings, keep the second as xmbName
 				str1 := readString(data, offset)
+				// slog.Debug("String 1", "str1", str1.value)
 				xmbName = readString(data, str1.endOffset)
+				// slog.Debug("String 2", "xmbName", xmbName.value)
 				offset = xmbName.endOffset
 			} else {
 				// If there is only one XMB file, it is stored 20 bytes after the start of the node
@@ -44,6 +46,7 @@ func parseXmbMap(data *[]byte, rootNode Node) (map[string]XmbFile, error) {
 }
 
 func parseXmb(data *[]byte, xmbFile XmbFile) (XmbNode, error) {
+	slog.Debug("Parsing XMB file", "xmbFile", xmbFile.name)
 	offset := xmbFile.offset
 	x1 := readUint16(data, offset)
 	if x1 != 12632 {

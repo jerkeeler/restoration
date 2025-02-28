@@ -112,6 +112,18 @@ func areBytesValidTokens(bytes ...byte) bool {
 		Determine whether any byte sequence is a valid Node token. Although there are no restrictions
 		on this function, a valid token must only be two bytes.
 	*/
+	if len(bytes) != 2 {
+		return false
+	}
+
+	// For now, we are skipping the values "kL" as that is not a valid node, but it now appears directly after the
+	// BG => GM => GD node, which was breaking the XMB parsing logic.
+	// TODO: Figure out what kL actually is, probably some data identifier, showcasing data length or something like
+	// that.
+	if bytes[0] == 107 && bytes[1] == 76 {
+		slog.Debug("Skipping token kL")
+		return false
+	}
 	allValid := true
 	for _, b := range bytes {
 		allValid = allValid && validAlphaNumericAscii(b)

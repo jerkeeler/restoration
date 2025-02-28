@@ -118,7 +118,7 @@ func (err FooterNotFoundError) Error() string {
 type UnkNotEqualTo1Error int
 
 func (err UnkNotEqualTo1Error) Error() string {
-	return fmt.Sprintf("The unknown byte in footer search did not equal 1 at offset %v", int(err))
+	return fmt.Sprintf("The unknown byte in footer search did not equal 1 at offset %v", strconv.FormatInt(int64(err), 16))
 }
 
 // ===============================

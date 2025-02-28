@@ -602,7 +602,7 @@ type FinishUnitTransformCommand struct {
 }
 
 func (cmd FinishUnitTransformCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt8, unpackInt8}
+	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt8, unpackInt8}
 	byteLength := 0
 	for _, f := range inputTypes {
 		byteLength += f()

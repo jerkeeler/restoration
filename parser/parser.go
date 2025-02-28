@@ -54,7 +54,7 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
-	// saveHex(&data, "decompressed.hex")
+	//saveHex(&data, "decompressed.hex")
 
 	rootNode := parseHeader(&data)
 
@@ -74,12 +74,16 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 		return ReplayFormatted{}, err
 	}
 	//printProfileKeys(profileKeys)
-	// techtreerootnode, err := parseXmb(&data, xmbMap["techtree"])
+	// for key, _ := range xmbMap {
+	// 	fmt.Println("==========================")
+	// 	fmt.Println(key)
+	// }
+	// techtreerootnode, err := parseXmb(&data, xmbMap["protounitcommands"])
 	// if err != nil {
 	// 	return ReplayFormatted{}, err
 	// }
 	// for _, child := range techtreerootnode.children {
-	// 	fmt.Println(child.attributes["name"])
+	// 	fmt.Println(child)
 	// }
 
 	svBytes := bytes.Index(raw_data, []byte{0x73, 0x76}) // search for index of the "sv" bytes

@@ -222,7 +222,6 @@ func parseGameCommand(data *[]byte, offset int, lastCommandListIdx int) (RawGame
 	*/
 	derefedData := *data
 	commandType := int(derefedData[offset+1])
-	// slog.Debug(fmt.Sprintf("Parsing game command with type=%v at offset=%v", commandType, offset))
 	tenBytesOffset := offset
 	offset += 10
 	if commandType == 14 {
@@ -293,6 +292,7 @@ func parseGameCommand(data *[]byte, offset int, lastCommandListIdx int) (RawGame
 		&sourceVectors,
 		&preArgumentBytes,
 	)
+	//slog.Debug(fmt.Sprintf("Parsing game command with type=%v at offset=%v", commandType, strconv.FormatInt(int64(offset), 16)))
 	gameCommand := refiner(&baseCmd, data)
 	offset += gameCommand.ByteLength()
 
