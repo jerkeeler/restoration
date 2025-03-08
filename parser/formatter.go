@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -42,7 +43,11 @@ func formatRawDataToReplay(
 		return ReplayFormatted{}, err
 	}
 	gameLengthSecs := (*commandList)[len(*commandList)-1].GameTimeSecs()
-	players := getPlayers(profileKeys, &majorGodMap, losingTeams, gameLengthSecs, commandList, &techTreeRootNode)
+	players, err := getPlayers(profileKeys, &majorGodMap, losingTeams, gameLengthSecs, commandList, &techTreeRootNode)
+	if err != nil {
+		return ReplayFormatted{}, err
+	}
+
 	slog.Debug("Game host time", "gameHostTime", (*profileKeys)["gamehosttime"])
 
 	// Find winning team by filtering for winners and taking first player's team
@@ -222,7 +227,7 @@ func getPlayers(
 	gameLengthSecs float64,
 	commandList *[]RawGameCommand,
 	techTreeRootNode *XmbNode,
-) []ReplayPlayer {
+) ([]ReplayPlayer, error) {
 	// Create a players slice, but checking if each player number exists in the profile keys. If it does, grab
 	// the relevant keys from the profileKeys map to construct a ReplayPlayer.
 	players := make([]ReplayPlayer, 0)
@@ -235,7 +240,7 @@ func getPlayers(
 			teamId := int(keys[fmt.Sprintf("%steamid", playerPrefix)].Int32Val)
 			if err != nil {
 				slog.Error("Error parsing profile id", "error", err)
-				continue
+				return nil, errors.New(fmt.Sprintf("Error parsing profile id %s", playerPrefix))
 			}
 			minorGods := getMinorGods(playerNum, commandList, techTreeRootNode)
 			eAPM := getEAPM(playerNum, commandList, gameLengthSecs)
@@ -255,7 +260,7 @@ func getPlayers(
 			})
 		}
 	}
-	return players
+	return players, nil
 }
 
 func playerExists(profileKeys *map[string]ProfileKey, playerNum int) bool {

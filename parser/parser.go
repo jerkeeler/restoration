@@ -54,7 +54,7 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
-	//saveHex(&data, "decompressed.hex")
+	// saveHex(&data, "decompressed.hex")
 
 	rootNode := parseHeader(&data)
 

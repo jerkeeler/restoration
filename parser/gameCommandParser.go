@@ -40,7 +40,7 @@ func newBaseCommand(
 
 func parseGameCommands(data *[]byte, headerEndOffset int) ([]RawGameCommand, error) {
 	offset := bytes.Index((*data)[headerEndOffset:], FOOTER)
-	slog.Debug("Parsing command list", "offset", strconv.FormatInt(int64(headerEndOffset+offset), 16))
+	// slog.Debug("Parsing command list", "offset", strconv.FormatInt(int64(headerEndOffset+offset), 16))
 
 	if offset == -1 {
 		return nil, FooterNotFoundError(offset)
@@ -121,7 +121,7 @@ func parseCommandList(data *[]byte, offset int, lastCommandListIdx int) (Command
 	*/
 	derefedData := *data
 	entryType := readUint32(data, offset)
-	// slog.Debug(fmt.Sprintf("Parsing command list at offset=%v entryType=%v", offset, entryType))
+	slog.Debug(fmt.Sprintf("Parsing command list at offset=%v entryType=%v", strconv.FormatInt(int64(offset), 16), entryType))
 	offset += 4
 	// earlyByte = data[offset]
 	offset += 1
@@ -292,7 +292,7 @@ func parseGameCommand(data *[]byte, offset int, lastCommandListIdx int) (RawGame
 		&sourceVectors,
 		&preArgumentBytes,
 	)
-	//slog.Debug(fmt.Sprintf("Parsing game command with type=%v at offset=%v", commandType, strconv.FormatInt(int64(offset), 16)))
+	// slog.Debug(fmt.Sprintf("Parsing game command with type=%v at offset=%v", commandType, strconv.FormatInt(int64(offset), 16)))
 	gameCommand := refiner(&baseCmd, data)
 	offset += gameCommand.ByteLength()
 
