@@ -738,9 +738,9 @@ type TauntCommand struct {
 }
 
 func (cmd TauntCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	// The taunt command is 41 bytes long, consisting of 10 int32s, followed by 1 int8.
+	// The taunt command is 45 bytes long, consisting of 11 int32s, followed by 1 int8.
 	// The 3rd int32 is the tauntIdo.
-	byteLength := 41
+	byteLength := 45
 	enrichBaseCommand(baseCommand, byteLength)
 	tauntId := readInt32(data, baseCommand.offset+8)
 	return TauntCommand{
@@ -995,7 +995,7 @@ type SeekShelterCommand struct {
 }
 
 func (cmd SeekShelterCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	inputTypes := []func() int{unpackInt32, unpackInt32}
+	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
 	byteLength := 0
 	for _, f := range inputTypes {
 		byteLength += f()
