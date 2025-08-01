@@ -86,10 +86,14 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 	// 	fmt.Println(child)
 	// }
 
+	commandCount := readUint32(&raw_data, 23)
+	slog.Debug("commandCount", "commandCount", commandCount)
+
 	svBytes := bytes.Index(raw_data, []byte{0x73, 0x76}) // search for index of the "sv" bytes
 	commandOffset := readUint32(&raw_data, svBytes+2)
 	slog.Debug("commandOffset", "commandOffset", commandOffset)
-	commandList, err := parseGameCommands(&raw_data, int(commandOffset))
+
+	commandList, err := parseGameCommands(&raw_data, int(commandOffset), int(commandCount))
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
