@@ -61,6 +61,7 @@ func BuildCommandFactory() *CommandFactory {
 	factory.Register(35, AutoScoutEventCommand{})
 	factory.Register(37, ChangeControlGroupContentsCommand{})
 	factory.Register(38, RepairCommand{})
+	factory.Register(39, UnknownCommand39{})
 	factory.Register(41, TauntCommand{})
 	factory.Register(44, CheatCommand{})
 	factory.Register(45, CancelQueuedItemCommand{})
@@ -74,6 +75,7 @@ func BuildCommandFactory() *CommandFactory {
 	factory.Register(71, SeekShelterCommand{})
 	factory.Register(72, PrequeueTechCommand{})
 	factory.Register(75, PrebuyGodPowerCommand{})
+	factory.Register(78, UnknownCommand78{})
 
 	return factory
 }
@@ -729,6 +731,24 @@ func (cmd RepairCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameC
 }
 
 // ========================================================================
+// 39 - Unknown
+// ========================================================================
+
+type UnknownCommand39 struct {
+	BaseCommand
+}
+
+func (cmd UnknownCommand39) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
+	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32}
+	byteLength := 0
+	for _, f := range inputTypes {
+		byteLength += f()
+	}
+	enrichBaseCommand(baseCommand, byteLength)
+	return UnknownCommand39{*baseCommand}
+}
+
+// ========================================================================
 // 41 - taunt
 // ========================================================================
 
@@ -1048,4 +1068,22 @@ func (cmd PrebuyGodPowerCommand) Refine(baseCommand *BaseCommand, data *[]byte) 
 	byteLength := 16
 	enrichBaseCommand(baseCommand, byteLength)
 	return PrebuyGodPowerCommand{*baseCommand}
+}
+
+// ========================================================================
+// 78 - Unknown
+// ========================================================================
+
+type UnknownCommand78 struct {
+	BaseCommand
+}
+
+func (cmd UnknownCommand78) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
+	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+	byteLength := 0
+	for _, f := range inputTypes {
+		byteLength += f()
+	}
+	enrichBaseCommand(baseCommand, byteLength)
+	return UnknownCommand78{*baseCommand}
 }
