@@ -38,7 +38,7 @@ func newBaseCommand(
 // that can be used.
 // =========================================================================
 
-func parseGameCommands(data *[]byte, headerEndOffset int) ([]RawGameCommand, error) {
+func parseGameCommands(data *[]byte, headerEndOffset int, commandCount int) ([]RawGameCommand, error) {
 	offset := bytes.Index((*data)[headerEndOffset:], FOOTER)
 	// slog.Debug("Parsing command list", "offset", strconv.FormatInt(int64(headerEndOffset+offset), 16))
 
@@ -46,32 +46,18 @@ func parseGameCommands(data *[]byte, headerEndOffset int) ([]RawGameCommand, err
 		return nil, FooterNotFoundError(offset)
 	}
 
-	firstFootEnd, err := findFooterOffset(data, headerEndOffset+offset)
-	if err != nil {
-		return nil, err
-	}
-	offset = firstFootEnd + 5
-	lastIndex := 1
+	offset += headerEndOffset - 19
 	commandList := make([]RawGameCommand, 0)
 
-	for {
-		if offset == len(*data)-1 {
-			// We've reached the end!
-			break
-		}
-		item, err := parseCommandList(data, offset, lastIndex)
+	for i := 1; i <= commandCount; i++ {
+		item, err := parseCommandList(data, offset, i)
 		if err != nil {
 			return commandList, err
 		}
 		// Add all the commands to the command list, flattening everything into a single list.
 		commandList = append(commandList, item.commands...)
-		if item.finalCommand {
-			// We've reached the end! Someone resigned.
-			break
-		}
-		lastIndex += 1
-		if item.entryIdx != lastIndex {
-			return commandList, fmt.Errorf("entryIdx was not sequential, item.entryIdx=%v, lastIndex=%v", item.entryIdx, lastIndex)
+		if item.entryIdx != i {
+			return commandList, fmt.Errorf("entryIdx was not sequential, item.entryIdx=%v, lastIndex=%v", item.entryIdx, i)
 		}
 		offset = item.offsetEnd
 	}
@@ -79,7 +65,7 @@ func parseGameCommands(data *[]byte, headerEndOffset int) ([]RawGameCommand, err
 	return commandList, nil
 }
 
-func findFooterOffset(data *[]byte, offset int) (int, error) {
+func findFooterEndOffset(data *[]byte, offset int) (int, error) {
 	/*
 		Each set of commands is followd by a "FOOTER" (footer is probably not the correct term) the demarcates the
 		end of the command sequence and the beginning of the next. This function finds end of this footer and the
@@ -93,17 +79,21 @@ func findFooterOffset(data *[]byte, offset int) (int, error) {
 	for i := 0; i < int(extraByteCount); i++ {
 		extraByteNumbers[i] = derefedData[offset+i]
 	}
+	offset += int(extraByteCount)
 	if extraByteCount > 0 {
 		slog.Debug(fmt.Sprintf("foot has %v extra bytes: %v", extraByteCount, extraByteNumbers))
 	}
 
 	unk := derefedData[offset]
-	if unk != 1 {
-		slog.Debug("unk not equal to 1", "unk", unk)
-		return -1, UnkNotEqualTo1Error(offset)
+	offset += 1
+
+	if unk == 0 {
+		offset += 8
+	} else if unk != 1 {
+		slog.Debug("unk not equal to 0 or 1", "unk", unk)
+		return -1, UnkNotExpectedValueError(offset)
 	}
 
-	offset += 9
 	oneFourthFooterLength := readUint16(data, offset)
 	offset += 4
 	endOffset := offset + 4*int(oneFourthFooterLength)
@@ -172,24 +162,7 @@ func parseCommandList(data *[]byte, offset int, lastCommandListIdx int) (Command
 		}
 	}
 
-	// TODO: Remove this and modify this to work for more than 1v1 replays.
-	// Check if the last command is the resign command. Right now, the code panics because it cannot find a footer
-	// after the resign command is issued. I haven't tried running this on team games yet, but I imagine that
-	// it might work correctly. We'll need a smarter way to determine the end of the command stream.
-	for _, cmd := range commands {
-		if cmd.CommandType() == 16 {
-			slog.Debug("Resign command issued", "cmd", cmd)
-			// Resign command issued, return the command list
-			return CommandList{
-				-1,
-				offset,
-				true,
-				commands,
-			}, nil
-		}
-	}
-
-	footerEndOffset, err := findFooterOffset(data, offset)
+	footerEndOffset, err := findFooterEndOffset(data, offset)
 	if err != nil {
 		return CommandList{}, err
 	}
@@ -209,7 +182,6 @@ func parseCommandList(data *[]byte, offset int, lastCommandListIdx int) (Command
 	return CommandList{
 		int(entryIdx),
 		offset,
-		false,
 		commands,
 	}, nil
 }

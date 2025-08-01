@@ -103,10 +103,9 @@ func (node NotRootNodeError) Error() string {
 }
 
 type CommandList struct {
-	entryIdx     int
-	offsetEnd    int
-	finalCommand bool
-	commands     []RawGameCommand
+	entryIdx  int
+	offsetEnd int
+	commands  []RawGameCommand
 }
 
 type FooterNotFoundError int
@@ -115,10 +114,10 @@ func (err FooterNotFoundError) Error() string {
 	return fmt.Sprintf("Footer not found searching at offset=%v", int(err))
 }
 
-type UnkNotEqualTo1Error int
+type UnkNotExpectedValueError int
 
-func (err UnkNotEqualTo1Error) Error() string {
-	return fmt.Sprintf("The unknown byte in footer search did not equal 1 at offset %v", strconv.FormatInt(int64(err), 16))
+func (err UnkNotExpectedValueError) Error() string {
+	return fmt.Sprintf("The unknown byte in footer search did not equal 0 or 1 at offset %v", strconv.FormatInt(int64(err), 16))
 }
 
 // ===============================
