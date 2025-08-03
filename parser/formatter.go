@@ -177,11 +177,6 @@ func getLosingTeams(commandList *[]RawGameCommand, profileKeys *map[string]Profi
 		}
 	}
 
-	// If no one resigned, return error
-	if len(resigningPlayers) == 0 {
-		return nil, fmt.Errorf("no resign commands found")
-	}
-
 	// Use a map to deduplicate team IDs
 	teamIds := make(map[int]bool)
 
@@ -193,10 +188,6 @@ func getLosingTeams(commandList *[]RawGameCommand, profileKeys *map[string]Profi
 		if teamId, ok := (*profileKeys)[teamIdKey]; ok {
 			teamIds[int(teamId.Int32Val)] = true
 		}
-	}
-
-	if len(teamIds) == 0 {
-		return nil, fmt.Errorf("could not find team IDs for resigning players")
 	}
 
 	return teamIds, nil
