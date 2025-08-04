@@ -227,12 +227,18 @@ func getPlayers(
 			slog.Debug("Parsing player", "playerNum", playerNum)
 			keys := *profileKeys
 			playerPrefix := fmt.Sprintf("gameplayer%d", playerNum)
-			profileId, err := strconv.Atoi(keys[fmt.Sprintf("%srlinkid", playerPrefix)].StringVal)
-			teamId := int(keys[fmt.Sprintf("%steamid", playerPrefix)].Int32Val)
-			if err != nil {
-				slog.Error("Error parsing profile id", "error", err)
-				return nil, errors.New(fmt.Sprintf("Error parsing profile id %s", playerPrefix))
+			profileIdStr := keys[fmt.Sprintf("%srlinkid", playerPrefix)].StringVal
+			var err error
+			var profileId int
+			// this is the case for AI player
+			if profileIdStr != "" {
+				profileId, err = strconv.Atoi(profileIdStr)
+				if err != nil {
+					slog.Error("Error parsing profile id", "error", err)
+					return nil, errors.New(fmt.Sprintf("Error parsing profile id %s", playerPrefix))
+				}
 			}
+			teamId := int(keys[fmt.Sprintf("%steamid", playerPrefix)].Int32Val)
 			minorGods := getMinorGods(playerNum, commandList, techTreeRootNode)
 			eAPM := getEAPM(playerNum, commandList, gameLengthSecs)
 			players = append(players, ReplayPlayer{
