@@ -74,6 +74,7 @@ func BuildCommandFactory() *CommandFactory {
 	factory.Register(69, BuildWallConnectorCommand{})
 	factory.Register(71, SeekShelterCommand{})
 	factory.Register(72, PrequeueTechCommand{})
+	factory.Register(73, UnknownCommand73{})
 	factory.Register(75, PrebuyGodPowerCommand{})
 	factory.Register(78, UnknownCommand78{})
 
@@ -1053,6 +1054,24 @@ func (cmd PrequeueTechCommand) Format(input FormatterInput) (ReplayGameCommand, 
 		CommandType:  "prequeueTech",
 		Payload:      input.techTreeRootNode.children[cmd.techId].attributes["name"],
 	}, true
+}
+
+// ========================================================================
+// 73 - Unknown
+// ========================================================================
+
+type UnknownCommand73 struct {
+	BaseCommand
+}
+
+func (cmd UnknownCommand73) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
+	inputTypes := []func() int{unpackInt32, unpackInt32}
+	byteLength := 0
+	for _, f := range inputTypes {
+		byteLength += f()
+	}
+	enrichBaseCommand(baseCommand, byteLength)
+	return UnknownCommand73{*baseCommand}
 }
 
 // ========================================================================
