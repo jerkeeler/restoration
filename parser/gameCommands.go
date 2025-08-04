@@ -1098,7 +1098,13 @@ type UnknownCommand78 struct {
 }
 
 func (cmd UnknownCommand78) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+	unknown := readInt32(data, baseCommand.offset+12)
+	if unknown == 3 {
+		inputTypes = append(inputTypes, unpackVector)
+	} else {
+		inputTypes = append(inputTypes, unpackInt32)
+	}
 	byteLength := 0
 	for _, f := range inputTypes {
 		byteLength += f()
