@@ -74,6 +74,7 @@ func BuildCommandFactory() *CommandFactory {
 	factory.Register(69, BuildWallConnectorCommand{})
 	factory.Register(71, SeekShelterCommand{})
 	factory.Register(72, PrequeueTechCommand{})
+	factory.Register(73, UnknownCommand73{})
 	factory.Register(75, PrebuyGodPowerCommand{})
 	factory.Register(78, UnknownCommand78{})
 
@@ -1056,6 +1057,24 @@ func (cmd PrequeueTechCommand) Format(input FormatterInput) (ReplayGameCommand, 
 }
 
 // ========================================================================
+// 73 - Unknown
+// ========================================================================
+
+type UnknownCommand73 struct {
+	BaseCommand
+}
+
+func (cmd UnknownCommand73) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
+	inputTypes := []func() int{unpackInt32, unpackInt32}
+	byteLength := 0
+	for _, f := range inputTypes {
+		byteLength += f()
+	}
+	enrichBaseCommand(baseCommand, byteLength)
+	return UnknownCommand73{*baseCommand}
+}
+
+// ========================================================================
 // 75 - prebuyGodPower
 // ========================================================================
 
@@ -1079,7 +1098,13 @@ type UnknownCommand78 struct {
 }
 
 func (cmd UnknownCommand78) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+	inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt32}
+	unknown := readInt32(data, baseCommand.offset+12)
+	if unknown == 3 {
+		inputTypes = append(inputTypes, unpackVector)
+	} else {
+		inputTypes = append(inputTypes, unpackInt32)
+	}
 	byteLength := 0
 	for _, f := range inputTypes {
 		byteLength += f()
