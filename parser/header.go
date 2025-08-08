@@ -50,11 +50,14 @@ func parseTree(data *[]byte, parentNode *Node) {
 			break
 		}
 
-		position = nextNodeLoc
-		childNode := newNode(data, position)
+		childNode := newNode(data, nextNodeLoc)
 		childNode.parent = parentNode
-		parentNode.children = append(parentNode.children, &childNode)
-		position = childNode.endOffset()
+		if childNode.endOffset() > parentNode.endOffset() || childNode.path() == "BG/GM/GD/uI" {
+			position = nextNodeLoc + 1
+		} else {
+			parentNode.children = append(parentNode.children, &childNode)
+			position = childNode.endOffset()
+		}
 	}
 
 	for _, child := range parentNode.children {
