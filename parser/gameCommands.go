@@ -113,6 +113,16 @@ type FormatterInput struct {
 	powersRootNode   *XmbNode
 }
 
+// protoName resolves a unit/building proto id to its human-readable name. The
+// proto XMB was removed from replays in build 601511; when the catalog isn't
+// present, node.children is nil and we return "unknown" rather than panicking.
+func protoName(node *XmbNode, id int32) string {
+	if node == nil || int(id) < 0 || int(id) >= len(node.children) {
+		return "unknown"
+	}
+	return node.children[id].attributes["name"]
+}
+
 type RawGameCommand interface {
 	CommandType() int
 	OffsetEnd() int
@@ -262,7 +272,7 @@ func (cmd TrainCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCo
 }
 
 func (cmd TrainCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
-	proto := input.protoRootNode.children[cmd.protoUnitId].attributes["name"]
+	proto := protoName(input.protoRootNode, cmd.protoUnitId)
 	return ReplayGameCommand{
 		GameTimeSecs: cmd.GameTimeSecs(),
 		PlayerNum:    cmd.PlayerId(),
@@ -307,7 +317,7 @@ type BuildCommandPaylod struct {
 }
 
 func (cmd BuildCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
-	proto := input.protoRootNode.children[cmd.protoBuildingId].attributes["name"]
+	proto := protoName(input.protoRootNode, cmd.protoBuildingId)
 	return ReplayGameCommand{
 		GameTimeSecs: cmd.GameTimeSecs(),
 		PlayerNum:    cmd.PlayerId(),
@@ -930,7 +940,7 @@ func (cmd AutoqueueCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGa
 }
 
 func (cmd AutoqueueCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
-	proto := input.protoRootNode.children[cmd.protoUnitId].attributes["name"]
+	proto := protoName(input.protoRootNode, cmd.protoUnitId)
 	return ReplayGameCommand{
 		GameTimeSecs: cmd.GameTimeSecs(),
 		PlayerNum:    cmd.PlayerId(),
@@ -1035,10 +1045,23 @@ type PrequeueTechCommand struct {
 }
 
 func (cmd PrequeueTechCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	// The prequeTech command is 13 bytes in length, bytes 8-12 are an int32 representing the id of the tech
-	// that was prequeued. The id maps to a string via the techtree XMB data stored in the header of the replay.
-	// inputTypes := []func() int{unpackInt32, unpackInt32, unpackInt32, unpackInt8}
+	// The prequeueTech command body always starts with 8 bytes of 0xff (a sentinel
+	// for "no source"), then 4 bytes of techId. After that:
+	//   - build < 601511: 1 trailing flag byte → byteLength = 13
+	//   - build ≥ 601511: 4 trailing bytes (a new field replacing the flag) → byteLength = 16
+	// The patch didn't touch other commands' byte layouts, so we don't thread a
+	// build number through the parser; instead we probe for the next command-list
+	// footer envelope (`00 01 0x19`) at the two candidate positions and pick the
+	// matching length.
+	derefedData := *data
+	o := baseCommand.offset
 	byteLength := 13
+	matchesAt := func(end int) bool {
+		return derefedData[o+end] == 0x00 && derefedData[o+end+1] == 0x01 && derefedData[o+end+2] == 0x19
+	}
+	if !matchesAt(13) && matchesAt(16) {
+		byteLength = 16
+	}
 	enrichBaseCommand(baseCommand, byteLength)
 	techId := readInt32(data, baseCommand.offset+8)
 	return PrequeueTechCommand{

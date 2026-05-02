@@ -42,6 +42,20 @@ func parseXmbMap(data *[]byte, rootNode Node) (map[string]XmbFile, error) {
 		dataLength := readUint32(data, offset+2)
 		offset += int(dataLength) + DATA_OFFSET
 	}
+
+	// Build 601511 (released 2026-05-02) moved the unit/building catalog out of
+	// a top-level "proto" gd into a sibling node "mU" under BG/GM/GD. The mU
+	// content begins with a 14-byte preamble (00 00 01 'gd' <uint32> 00 00 01
+	// 00 00 00) and then a normal X1 XMB whose root element is "proto". The
+	// XMB extends past mU's reported size into the bytes that the header walk
+	// otherwise mistakes for sibling XN nodes; parseXmb is structure-driven so
+	// it reads through them correctly.
+	for _, mU := range rootNode.getChildren("GM", "GD", "mU") {
+		xmbMap["proto"] = XmbFile{
+			name:   "proto",
+			offset: mU.offset + DATA_OFFSET + 14,
+		}
+	}
 	return xmbMap, nil
 }
 

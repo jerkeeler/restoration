@@ -26,13 +26,13 @@ func formatRawDataToReplay(
 	slog.Debug(buildString)
 	buildNumber := getBuildNumber(buildString)
 
-	godsRootNode, err := parseXmb(data, (*xmbMap)["civs"])
+	godsRootNode, err := parseXmbIfPresent(data, xmbMap, "civs")
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
 	majorGodMap := buildGodMap(&godsRootNode)
 
-	techTreeRootNode, err := parseXmb(data, (*xmbMap)["techtree"])
+	techTreeRootNode, err := parseXmbIfPresent(data, xmbMap, "techtree")
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
@@ -61,11 +61,11 @@ func formatRawDataToReplay(
 
 	gameOptions := getGameOptions(profileKeys)
 	var gameCommands []ReplayGameCommand
-	protoRootNode, err := parseXmb(data, (*xmbMap)["proto"])
+	protoRootNode, err := parseXmbIfPresent(data, xmbMap, "proto")
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
-	powersRootNode, err := parseXmb(data, (*xmbMap)["powers"])
+	powersRootNode, err := parseXmbIfPresent(data, xmbMap, "powers")
 	if err != nil {
 		return ReplayFormatted{}, err
 	}
@@ -404,4 +404,17 @@ func addTechsToPlayers(players *[]ReplayPlayer, gameCommands *[]ReplayGameComman
 			}
 		}
 	}
+}
+
+// parseXmbIfPresent looks up an XMB by name and parses it if it exists in the
+// replay. Game patches occasionally remove or rename embedded XMB files; rather
+// than fail the whole parse, missing entries log a warning and return a zero
+// XmbNode so downstream lookups can degrade to "unknown" instead of panicking.
+func parseXmbIfPresent(data *[]byte, xmbMap *map[string]XmbFile, name string) (XmbNode, error) {
+	f, ok := (*xmbMap)[name]
+	if !ok {
+		slog.Warn("XMB not present in replay; downstream lookups will return 'unknown'", "name", name)
+		return XmbNode{}, nil
+	}
+	return parseXmb(data, f)
 }
