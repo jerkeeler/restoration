@@ -269,3 +269,18 @@ to add coverage for whatever the patch changed.
   - Be liberal with `slog.Debug`
 - Keep the output from the `parse` command clean, it should only be JSON. Ideally one can then take the standard output and pipe it into a file or any other tool (such as `jq`).
   - For example you could get the mapname and winners using this jq string: `jq '{map: .MapName, players: [.Players[] | {name: .Name, winner: .Winner}]}' test.json`
+
+### `tools/` — Python probes for patch-debugging
+
+The [`tools/`](tools/) directory contains ad-hoc Python scripts used when an
+AoM patch breaks parsing: a command-stream tracer that bisects the failure to
+a specific command, and an inner-bytes decompressor for header/XMB diffing.
+They mirror Go-parser logic, are not shipped in the release binary, and have
+[PEP 723](https://peps.python.org/pep-0723/) inline metadata so they run with
+[`uv`](https://docs.astral.sh/uv/) and zero setup:
+
+```bash
+uv run tools/trace_command_stream.py path/to/replay.mythrec
+```
+
+See `tools/CLAUDE.md` for what's there and when to reach for it.

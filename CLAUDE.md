@@ -14,6 +14,7 @@ The format is **not officially documented**. Knowledge of it is reverse-engineer
 main.go                 # thin entry: cmd.Execute()
 cmd/                    # Cobra CLI (root, parse, rename, version)
 parser/                 # all replay-decoding logic — see parser/CLAUDE.md
+tools/                  # ad-hoc Python probes for patch-debugging (uv-runnable) — see tools/CLAUDE.md
 bin/build.sh            # cross-compile for linux/darwin/windows
 .github/workflows/      # release workflow, triggers on `v*` tag push
 releases/               # build output (gitignored)
@@ -153,4 +154,5 @@ Run these in order; each rules out a layer of the format:
 ## Pointers to deeper docs
 
 - `parser/CLAUDE.md` — internals of the parser package: format anatomy, file roles, decoding pipeline, gotchas.
+- `tools/CLAUDE.md` — the ad-hoc Python probes for patch-debugging (command-stream tracer, inner-bytes decompressor); when to reach for them and how they drift from the Go parser.
 - `README.md` — user-facing docs and example output. Update this when changing CLI flags or output shape.
