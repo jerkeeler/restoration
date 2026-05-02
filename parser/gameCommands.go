@@ -1045,14 +1045,14 @@ type PrequeueTechCommand struct {
 }
 
 func (cmd PrequeueTechCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	// The prequeueTech command body is 16 bytes: 8 bytes of 0xff (a "no source"
-	// sentinel), 4 bytes of techId, and 4 trailing bytes (purpose unknown).
+	// Body: 8 bytes of 0xff (a "no source" sentinel), 4 bytes of techId, 4 trailing
+	// bytes (purpose unknown).
 	//
-	// Builds before 601511 used a 13-byte body (1 trailing flag byte instead of 4).
-	// We do not support those builds — replays from old patches will misalign here.
-	// The previous probe-and-detect was unreliable for replays that mix prequeueTech
-	// with selected-unit lists or non-trailing positions, and threading a build
-	// number through every command refiner isn't worth the complexity for one field.
+	// Patch history (see "Patch compatibility policy" in the project root CLAUDE.md
+	// for why we don't probe-and-detect):
+	//   2026-05-02: build 601511 changed the size from 13 to 16 (the trailing 1-byte
+	//               flag became a 4-byte field). Replays from older builds misalign
+	//               here — use a matching older release of this parser to read them.
 	byteLength := 16
 	enrichBaseCommand(baseCommand, byteLength)
 	techId := readInt32(data, baseCommand.offset+8)

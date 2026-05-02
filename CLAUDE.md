@@ -75,6 +75,33 @@ The replay format is reverse-engineered. Several things are explicitly unfinishe
 
 When AoM ships a patch, the parser may break. Recent commit history is dominated by post-patch fixes (commands 73/78, AI player parsing, node misrecognition). Treat the parser as a living artifact that tracks the live game.
 
+## Patch compatibility policy
+
+**The parser tracks the current AoM build. It does not try to read replays from older builds.** When a patch changes a byte layout, hardcode the new size and move on — don't probe-and-detect, don't thread build numbers through the refiners, don't accumulate format-version branches.
+
+Why:
+- The replay format is reverse-engineered and brittle. Each compatibility branch is another thing that can be subtly wrong (the May-2026 `prequeueTech` probe matched the trailing footer envelope but quietly defaulted to the old length when prequeueTech sat mid-list — silently wrong for several real games before we noticed).
+- Per-build branches in refiners compound: every future patch widens the matrix. Hardcoding keeps `gameCommands.go` readable.
+- Old replays still exist — but read them with the parser version that was current when the replay was recorded. The release workflow tags every parser version, so the binaries are still on GitHub Releases.
+
+What to do when a patch shifts a byte layout:
+
+1. Confirm the new size (see the playbook below) and update the refiner.
+2. **Annotate the change in the refiner with a dated comment** so future readers can see at a glance which builds the current code targets:
+   ```go
+   // Patch history:
+   //   YYYY-MM-DD: build NNNNNN changed the size from X to Y. <one-line why if known>
+   ```
+   Keep entries in chronological order. A short stack of these is fine; it's a useful record, not clutter.
+3. Bump `parser.VERSION` (`parser/consts.go`) and tag the commit so the release workflow ships a binary that's pinned to "this parser parses replays from build NNNNNN onward."
+4. Mention the build cutover in the PR description so users searching for "won't parse my old replay" can find which release to download.
+
+When *not* to apply this policy:
+- A change that is genuinely build-agnostic (e.g. tolerating a new header token added without removing the old one). If both old and new replays still produce identical output through the new code, no patch-history comment is needed.
+- A bug fix that wasn't actually a format change — fix the bug, no patch-history note.
+
+The user-facing version of this policy lives in `README.md` ("Patch compatibility").
+
 ## Verifying a change
 
 There is no `go test ./...` to lean on. After touching `parser/`:

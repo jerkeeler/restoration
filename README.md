@@ -231,6 +231,24 @@ Game commands will be a long list that looks like the following when not in slim
 4. Not all command types are currently paresd and stored in the output JSON, if you have a request for a specific command type please open an issue.
 5. There are currently no stats calculations and a bunch of metadata flags
 
+## Patch compatibility
+
+`restoration` tracks the **current** AoM: Retold build. The replay format is
+reverse-engineered and AoM patches occasionally shift byte layouts inside the
+command log. When that happens we update the parser to match the new build —
+we do not try to read replays from older builds with the same binary.
+
+**To parse an old replay**, download the release of `restoration` that was
+current when the replay was recorded from the
+[Releases page](https://github.com/jerkeeler/restoration/releases). Each
+release pins to the AoM build it was built against; release notes call out
+the cutover. The version emitted in the JSON output (`ParserVersion`) tells
+you which release produced any given parse.
+
+If you have a replay that won't parse and you believe it is from the current
+build, please open an issue and attach the replay — that's the input we need
+to add coverage for whatever the patch changed.
+
 ## Roadmap
 
 - [x] Add support for team games
