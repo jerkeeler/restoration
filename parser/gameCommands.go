@@ -1045,23 +1045,15 @@ type PrequeueTechCommand struct {
 }
 
 func (cmd PrequeueTechCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
-	// The prequeueTech command body always starts with 8 bytes of 0xff (a sentinel
-	// for "no source"), then 4 bytes of techId. After that:
-	//   - build < 601511: 1 trailing flag byte → byteLength = 13
-	//   - build ≥ 601511: 4 trailing bytes (a new field replacing the flag) → byteLength = 16
-	// The patch didn't touch other commands' byte layouts, so we don't thread a
-	// build number through the parser; instead we probe for the next command-list
-	// footer envelope (`00 01 0x19`) at the two candidate positions and pick the
-	// matching length.
-	derefedData := *data
-	o := baseCommand.offset
-	byteLength := 13
-	matchesAt := func(end int) bool {
-		return derefedData[o+end] == 0x00 && derefedData[o+end+1] == 0x01 && derefedData[o+end+2] == 0x19
-	}
-	if !matchesAt(13) && matchesAt(16) {
-		byteLength = 16
-	}
+	// The prequeueTech command body is 16 bytes: 8 bytes of 0xff (a "no source"
+	// sentinel), 4 bytes of techId, and 4 trailing bytes (purpose unknown).
+	//
+	// Builds before 601511 used a 13-byte body (1 trailing flag byte instead of 4).
+	// We do not support those builds — replays from old patches will misalign here.
+	// The previous probe-and-detect was unreliable for replays that mix prequeueTech
+	// with selected-unit lists or non-trailing positions, and threading a build
+	// number through every command refiner isn't worth the complexity for one field.
+	byteLength := 16
 	enrichBaseCommand(baseCommand, byteLength)
 	techId := readInt32(data, baseCommand.offset+8)
 	return PrequeueTechCommand{
