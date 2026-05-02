@@ -231,6 +231,24 @@ Game commands will be a long list that looks like the following when not in slim
 4. Not all command types are currently paresd and stored in the output JSON, if you have a request for a specific command type please open an issue.
 5. There are currently no stats calculations and a bunch of metadata flags
 
+## Patch compatibility
+
+`restoration` tracks the **current** AoM: Retold build. The replay format is
+reverse-engineered and AoM patches occasionally shift byte layouts inside the
+command log. When that happens we update the parser to match the new build —
+we do not try to read replays from older builds with the same binary.
+
+**To parse an old replay**, download the release of `restoration` that was
+current when the replay was recorded from the
+[Releases page](https://github.com/jerkeeler/restoration/releases). Each
+release pins to the AoM build it was built against; release notes call out
+the cutover. The version emitted in the JSON output (`ParserVersion`) tells
+you which release produced any given parse.
+
+If you have a replay that won't parse and you believe it is from the current
+build, please open an issue and attach the replay — that's the input we need
+to add coverage for whatever the patch changed.
+
 ## Roadmap
 
 - [x] Add support for team games
@@ -251,3 +269,18 @@ Game commands will be a long list that looks like the following when not in slim
   - Be liberal with `slog.Debug`
 - Keep the output from the `parse` command clean, it should only be JSON. Ideally one can then take the standard output and pipe it into a file or any other tool (such as `jq`).
   - For example you could get the mapname and winners using this jq string: `jq '{map: .MapName, players: [.Players[] | {name: .Name, winner: .Winner}]}' test.json`
+
+### `tools/` — Python probes for patch-debugging
+
+The [`tools/`](tools/) directory contains ad-hoc Python scripts used when an
+AoM patch breaks parsing: a command-stream tracer that bisects the failure to
+a specific command, and an inner-bytes decompressor for header/XMB diffing.
+They mirror Go-parser logic, are not shipped in the release binary, and have
+[PEP 723](https://peps.python.org/pep-0723/) inline metadata so they run with
+[`uv`](https://docs.astral.sh/uv/) and zero setup:
+
+```bash
+uv run tools/trace_command_stream.py path/to/replay.mythrec
+```
+
+See `tools/CLAUDE.md` for what's there and when to reach for it.
