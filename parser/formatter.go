@@ -266,6 +266,33 @@ func playerExists(profileKeys *map[string]ProfileKey, playerNum int) bool {
 	return (*profileKeys)[playerKey].StringVal != ""
 }
 
+// nonMinorGodAgeUpSuffixes are tech-name suffixes that appear in the techtree as
+// "<Age>Age<Suffix>" but are NOT player-selectable minor gods: major god names
+// (e.g. MythicAgeIsis, HeroicAgeRa) and civilization tokens (ClassicalAgeAztec,
+// MythicAgeGeneral). These are template/placeholder entries the engine carries
+// alongside the real age-up techs.
+//
+// Why this matters: Aztec players' replays contain phantom prequeueTech commands
+// pointing at these placeholder techIds — most likely emitted by the age-up UI
+// when the player interacts with it. The phantoms have no in-game effect (the
+// player's actual choice is queued separately) but `getMinorGods` would record
+// the placeholder's suffix as the minor god, e.g. mistakenly reporting
+// "Isis"/"Ra" for an Aztec. Skipping these suffixes lets the real age-up tech
+// fill the slot.
+var nonMinorGodAgeUpSuffixes = map[string]struct{}{
+	// Major gods — never appear as a minor god of any civ.
+	"Zeus": {}, "Hades": {}, "Poseidon": {},
+	"Ra": {}, "Isis": {}, "Set": {},
+	"Thor": {}, "Odin": {}, "Loki": {}, "Freyr": {},
+	"Kronos": {}, "Oranos": {}, "Gaia": {}, "Demeter": {},
+	"Fuxi": {}, "Nuwa": {}, "Shennong": {},
+	"Amaterasu": {}, "Tsukuyomi": {}, "Susanoo": {},
+	"Huitzilopochtli": {}, "Tezcatlipoca": {}, "Quetzalcoatl": {},
+	// Civilization tokens / catch-alls — template entries only.
+	"Greek": {}, "Egyptian": {}, "Norse": {}, "Atlantean": {},
+	"Chinese": {}, "Japanese": {}, "Aztec": {}, "General": {},
+}
+
 func getMinorGods(playerNum int, commandList *[]RawGameCommand, techTreeRootNode *XmbNode) [3]string {
 	// Filter to all Research/prequeue techs that are Age Up tech,
 	ageUpTechs := []string{}
@@ -289,19 +316,32 @@ func getMinorGods(playerNum int, commandList *[]RawGameCommand, techTreeRootNode
 
 	slog.Debug("Age up techs", "playerNum", playerNum, "techs", ageUpTechs)
 
-	// Find the last occurrence of each age type and removes the prefix to make it look pretty
+	// Find the last occurrence of each age type and remove the prefix to make
+	// it look pretty. Skip any tech whose suffix is a major god or civ token
+	// (see nonMinorGodAgeUpSuffixes).
 	var classical, heroic, mythic string
 	for _, tech := range ageUpTechs {
 		if strings.HasPrefix(tech, "ClassicalAge") {
-			classical = strings.TrimPrefix(tech, "ClassicalAge")
+			if suffix := strings.TrimPrefix(tech, "ClassicalAge"); !isNonMinorGodSuffix(suffix) {
+				classical = suffix
+			}
 		} else if strings.HasPrefix(tech, "HeroicAge") {
-			heroic = strings.TrimPrefix(tech, "HeroicAge")
+			if suffix := strings.TrimPrefix(tech, "HeroicAge"); !isNonMinorGodSuffix(suffix) {
+				heroic = suffix
+			}
 		} else if strings.HasPrefix(tech, "MythicAge") {
-			mythic = strings.TrimPrefix(tech, "MythicAge")
+			if suffix := strings.TrimPrefix(tech, "MythicAge"); !isNonMinorGodSuffix(suffix) {
+				mythic = suffix
+			}
 		}
 	}
 
 	return [3]string{classical, heroic, mythic}
+}
+
+func isNonMinorGodSuffix(suffix string) bool {
+	_, ok := nonMinorGodAgeUpSuffixes[suffix]
+	return ok
 }
 
 func getEAPM(playerNum int, commandList *[]RawGameCommand, gameLengthSecs float64) float64 {
