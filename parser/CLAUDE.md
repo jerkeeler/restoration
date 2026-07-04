@@ -104,7 +104,7 @@ When a refiner advances the cursor by a constant (e.g. `offset += 20`), comment 
 
 ### Fragile spots to know about
 
-- `Unknown78` reads a byte at `offset+12` to decide between 20 and 24-byte length — pure heuristic.
+- `Unknown78` reads `unknown2` at `offset+12`; `3` means a vector follows, otherwise `unknown2` uint32 values follow.
 - Formation IDs are hardcoded `0=line, 1=box, 2=spread`; anything else logs a warning and becomes `"unknown"`.
 - Resource IDs only recognize 1=wood, 2=food. Gold / favor / etc. fall through to `"unknown"` — likely incomplete.
 - `cheatCommand` stores the cheat ID but does not yet resolve the name (TODO in `gameCommands.go`).
