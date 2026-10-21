@@ -21,10 +21,11 @@ func (err NotL33t) Error() string {
 	return string(err)
 }
 
+// Vector3 is a world-space position. X and Z span the map floor; Y is elevation.
 type Vector3 struct {
-	X int32
-	Y int32
-	Z int32
+	X float32
+	Y float32
+	Z float32
 }
 
 // ===============================
