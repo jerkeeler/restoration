@@ -11,6 +11,8 @@ Takes a `.mythrec` file path, decompresses it, walks its binary node tree, parse
 ```go
 parser.ParseToJson(replayPath string, prettyPrint, slim, stats, isGzip bool) (string, error)
 parser.Parse(replayPath string, slim, stats, isGzip bool) (ReplayFormatted, error)
+parser.ParsePlaybackToJson(replayPath string, prettyPrint, isGzip bool) (string, error)
+parser.ParsePlayback(replayPath string, isGzip bool) (ReplayPlayback, error)
 parser.RenameRecFiles(dir string, isGzip bool, prefix, suffix string) error
 parser.VERSION  // const, kept in consts.go
 ```
@@ -21,7 +23,10 @@ parser.VERSION  // const, kept in consts.go
 
 | File                    | Responsibility                                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `parser.go`             | Top-level orchestration: `Parse`, `ParseToJson`, profile-key reader                               |
+| `parser.go`             | Top-level orchestration: `decodeReplay`, `Parse`, `ParseToJson`, profile-key reader               |
+| `playback.go`           | `ParsePlayback`: map snapshot + one located `PlaybackEvent` per command                           |
+| `terrain.go`            | Decodes `J1/TN`: texture groups, tile grids, water, heightmap                                     |
+| `entities.go`           | Decodes `J1/Z1`: every object on the map at game start                                            |
 | `decoder.go`            | Low-level binary primitives: int/float/bool/vector/string readers, gzip + l33t decompression      |
 | `header.go`             | Parses the recursive node tree at the front of the file (the "header")                            |
 | `xmb.go`                | Parses XMB (binary XML) blobs embedded in the header                                              |
@@ -45,6 +50,11 @@ Convention: `parse*` functions operate on raw `[]byte`. Everything else operates
        │     Nodes in NODES_WITH_SUBSTRUCTURE ({BG, J1, PL, BP, MP, GM, GD}) contain children;
        │     others are leaves. Profile keys (player names, map, seed, game options) live here.
        │     Root token is "BG".
+       ├─ Game-state snapshot (J1)
+       │     The game's save state at tick 0. TN holds terrain: texture groups, then per-tile grids
+       │     (TT = texture group, TS = texture within that group, WT = water type) and per-vertex heights.
+       │     Z1 holds every entity (id, owner, float position, proto id). See terrain.go / entities.go.
+       │     Much of J1 (KB, W1-W9, TM, an 810x810 RGBA grid inside TN) is still unexplored.
        ├─ XMB blocks
        │     Embedded under GM/GD nodes. Binary XML files: civs, techtree, proto, powers, etc.
        │     They're the lookup tables that map numeric IDs in commands → human-readable names.
@@ -77,6 +87,18 @@ Parse
 ```
 
 The XMB tables are large; `formatRawDataToReplay` parses them once and shares them across all command-formatting calls. Don't move XMB parsing back into `parseHeader` — it materially slows batch processing.
+
+## Playback
+
+`ParsePlayback` reuses `decodeReplay` and `formatRawDataToReplay`, then adds the map, entities, and events.
+Things that bit us while reverse-engineering it:
+
+- Command vectors are float32 world coordinates. `(-1, -1, -1)` means "no location".
+- `TT` is the texture **group** index, not a passability flag. Reading `TS` as a flat index gives aztec texture names
+  on Egyptian maps. Group names (`NonPassableLand`, `Shoreline`) carry the meaning.
+- Task commands put the clicked point in the source vectors and the target entity id + position in the body.
+- Z1 has bytes between records we don't understand, so `parseEntities` scans for the `H1` then `EN` signature.
+- `commandTypeNames` must name every registered command type; `TestEveryRegisteredCommandHasAName` enforces it.
 
 ## Game commands
 
