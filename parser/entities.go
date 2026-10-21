@@ -45,6 +45,7 @@ func parseEntities(data *[]byte, rootNode Node, protoRootNode *XmbNode) ([]Repla
 			PlayerNum: int(readUint32(data, enBody+8)),
 			Name:      protoName(protoRootNode, readInt32(data, p1+DATA_OFFSET)),
 			X:         location.X,
+			Y:         location.Y,
 			Z:         location.Z,
 		})
 		position = recordEnd

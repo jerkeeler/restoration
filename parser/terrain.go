@@ -95,7 +95,6 @@ func parseTerrain(data *[]byte, rootNode Node) (ReplayMap, error) {
 	if err != nil {
 		return ReplayMap{}, err
 	}
-	heightMin, heightMax, quantized := quantizeHeights(heights)
 
 	return ReplayMap{
 		Width:        width,
@@ -105,9 +104,7 @@ func parseTerrain(data *[]byte, rootNode Node) (ReplayMap, error) {
 		TileTextures: base64.StdEncoding.EncodeToString(tileTextures),
 		WaterTypes:   waterPalette,
 		TileWater:    base64.StdEncoding.EncodeToString(tileWater),
-		HeightMin:    heightMin,
-		HeightMax:    heightMax,
-		Heights:      base64.StdEncoding.EncodeToString(quantized),
+		Heights:      base64.StdEncoding.EncodeToString(heights),
 	}, nil
 }
 
@@ -143,16 +140,13 @@ func parseStringList(data *[]byte, position int) ([]string, int) {
 	return values, position
 }
 
-func parseHeights(data *[]byte, position int, expected int, upperBound int) ([]float32, error) {
+// parseHeights returns the heightmap's raw float32 little-endian bytes, which is already the output encoding.
+func parseHeights(data *[]byte, position int, expected int, upperBound int) ([]byte, error) {
 	count := int(readUint32(data, position))
 	if count != expected || position+4+4*count > upperBound {
 		return nil, fmt.Errorf("expected %v terrain heights at offset=%v, found count=%v", expected, position, count)
 	}
-	heights := make([]float32, count)
-	for i := range heights {
-		heights[i] = readFloat(data, position+4+4*i)
-	}
-	return heights, nil
+	return (*data)[position+4 : position+4+4*count], nil
 }
 
 // paletteGrid re-indexes a per-tile lookup into a palette of only the indices in use, in first-seen order, so each
@@ -177,22 +171,4 @@ func paletteGrid(indices []int, emptyIdx int) ([]int, []byte, error) {
 		grid[i] = paletteIdx[idx]
 	}
 	return palette, grid, nil
-}
-
-// quantizeHeights scales heights into one byte each. Map elevations span ~20 world units, so the rounding
-// error stays under 0.05, well below anything a minimap shows.
-func quantizeHeights(heights []float32) (float32, float32, []byte) {
-	heightMin, heightMax := heights[0], heights[0]
-	for _, h := range heights {
-		heightMin, heightMax = min(heightMin, h), max(heightMax, h)
-	}
-	quantized := make([]byte, len(heights))
-	span := heightMax - heightMin
-	if span == 0 {
-		return heightMin, heightMax, quantized
-	}
-	for i, h := range heights {
-		quantized[i] = byte((h-heightMin)/span*255 + 0.5)
-	}
-	return heightMin, heightMax, quantized
 }

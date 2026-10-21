@@ -84,12 +84,12 @@ func TestParseTerrain(t *testing.T) {
 	if water := decodeBase64(t, got.TileWater); !reflect.DeepEqual(water, []byte{DRY_TILE, 0, DRY_TILE, DRY_TILE}) {
 		t.Errorf("TileWater = %v, want [255 0 255 255]", water)
 	}
-	if got.HeightMin != 0 || got.HeightMax != 12 {
-		t.Errorf("height range = [%v, %v], want [0, 12]", got.HeightMin, got.HeightMax)
+	wantHeights := &byteWriter{}
+	for i := 0; i < 9; i++ {
+		wantHeights.f32(float32(i) * 1.5)
 	}
-	wantHeights := []byte{0, 32, 64, 96, 128, 159, 191, 223, 255}
-	if heights := decodeBase64(t, got.Heights); !reflect.DeepEqual(heights, wantHeights) {
-		t.Errorf("Heights = %v, want %v", heights, wantHeights)
+	if heights := decodeBase64(t, got.Heights); !reflect.DeepEqual(heights, wantHeights.buf) {
+		t.Errorf("Heights = %v, want float32 bytes %v", heights, wantHeights.buf)
 	}
 }
 
@@ -166,12 +166,5 @@ func TestPaletteGridTooManyValues(t *testing.T) {
 	}
 	if _, _, err := paletteGrid(indices, -1); err == nil {
 		t.Error("paletteGrid() error = nil, want error for more than 255 distinct values")
-	}
-}
-
-func TestQuantizeHeightsFlatMap(t *testing.T) {
-	heightMin, heightMax, quantized := quantizeHeights([]float32{3, 3, 3})
-	if heightMin != 3 || heightMax != 3 || !reflect.DeepEqual(quantized, []byte{0, 0, 0}) {
-		t.Errorf("quantizeHeights() = %v, %v, %v, want 3, 3, [0 0 0]", heightMin, heightMax, quantized)
 	}
 }

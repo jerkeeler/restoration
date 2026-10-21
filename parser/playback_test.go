@@ -22,6 +22,7 @@ func TestFormatPlaybackEvent(t *testing.T) {
 		techTreeRootNode: &XmbNode{},
 		powersRootNode: &XmbNode{children: []*XmbNode{
 			{attributes: map[string]string{"name": "Bolt", "godpower": "1"}},
+			{attributes: map[string]string{"name": "ShiftingSands", "godpower": "1"}},
 		}},
 	}
 	tests := []struct {
@@ -70,6 +71,22 @@ func TestFormatPlaybackEvent(t *testing.T) {
 				location2:    offMap,
 			},
 			want: PlaybackEvent{CommandType: "godPower", Name: "Bolt", Location: &Vector3{X: 5, Z: 6}, Units: []uint32{1}},
+		},
+		{
+			name: "two-point god power keeps both locations",
+			command: ProtoPowerCommand{
+				BaseCommand:  testBase(12, 1, []uint32{1}),
+				protoPowerId: 1,
+				location1:    Vector3{X: 5, Z: 6},
+				location2:    Vector3{X: 90, Z: 120},
+			},
+			want: PlaybackEvent{
+				CommandType: "godPower",
+				Name:        "ShiftingSands",
+				Location:    &Vector3{X: 5, Z: 6},
+				Location2:   &Vector3{X: 90, Z: 120},
+				Units:       []uint32{1},
+			},
 		},
 		{
 			name: "gather point uses its own location",

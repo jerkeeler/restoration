@@ -43,9 +43,9 @@ func TestParseEntities(t *testing.T) {
 	}
 
 	want := []ReplayEntity{
-		{Id: 0, PlayerNum: 1, Name: "TownCenter", X: 81, Z: 217},
-		{Id: 5, PlayerNum: 0, Name: "TreePalm", X: 120.5, Z: 33.25},
-		{Id: 7, PlayerNum: 2, Name: "unknown", X: 10, Z: 20},
+		{Id: 0, PlayerNum: 1, Name: "TownCenter", X: 81, Y: 4, Z: 217},
+		{Id: 5, PlayerNum: 0, Name: "TreePalm", X: 120.5, Y: 4, Z: 33.25},
+		{Id: 7, PlayerNum: 2, Name: "unknown", X: 10, Y: 4, Z: 20},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("parseEntities() = %+v, want %+v", got, want)

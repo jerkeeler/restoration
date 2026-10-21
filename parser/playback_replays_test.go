@@ -51,8 +51,8 @@ func checkMap(t *testing.T, replayMap ReplayMap) {
 		t.Errorf("TileWater has %v tiles, want %v", len(water), tiles)
 	}
 	vertices := (replayMap.Width + 1) * (replayMap.Height + 1)
-	if heights := decodeBase64(t, replayMap.Heights); len(heights) != vertices {
-		t.Errorf("Heights has %v vertices, want %v", len(heights), vertices)
+	if heights := decodeBase64(t, replayMap.Heights); len(heights) != 4*vertices {
+		t.Errorf("Heights has %v bytes, want 4 per vertex for %v vertices", len(heights), vertices)
 	}
 }
 

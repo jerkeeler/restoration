@@ -254,10 +254,7 @@ type ReplayMap struct {
 	TileTextures string
 	WaterTypes   []string // Palette for TileWater
 	TileWater    string   // 255 = dry
-	HeightMin    float32
-	HeightMax    float32
-	// Heights has one byte per vertex, (Width+1)*(Height+1) of them, x-major.
-	// Elevation = HeightMin + byte/255 * (HeightMax - HeightMin).
+	// Heights is base64 of little-endian float32 elevations, one per vertex: (Width+1)*(Height+1) of them, x-major.
 	Heights string
 }
 
@@ -271,6 +268,7 @@ type ReplayEntity struct {
 	PlayerNum int // 0 = Mother Nature
 	Name      string
 	X         float32
+	Y         float32
 	Z         float32
 }
 
@@ -280,6 +278,7 @@ type PlaybackEvent struct {
 	CommandType  string
 	Name         string   `json:",omitempty"` // Unit, building, tech, or power the command refers to
 	Location     *Vector3 `json:",omitempty"`
+	Location2    *Vector3 `json:",omitempty"` // Second point of two-point god powers like Shifting Sands
 	TargetId     *int32   `json:",omitempty"` // Entity a task targets, matching ReplayEntity.Id or a unit made later
 	Units        []uint32 `json:",omitempty"` // Entities the command was issued to
 }

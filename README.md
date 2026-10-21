@@ -126,16 +126,18 @@ with the command log. The output has four parts besides the match metadata and p
 - `Map` holds the tile grids and heightmap. Each grid is base64 with one byte per tile, ordered x-major
   (`index = tileX * Height + tileZ`). `TileTextures` indexes into `Textures`, which lists each texture name and
   its group (`PassableLand`, `Shoreline`, `NonPassableLand`, and so on). `TileWater` indexes into `WaterTypes`,
-  with 255 for dry tiles. `Heights` has one byte per tile corner, `(Width + 1) * (Height + 1)` of them, scaled
-  between `HeightMin` and `HeightMax`.
+  with 255 for dry tiles. `Heights` is base64 of little-endian float32 elevations, one per tile corner,
+  `(Width + 1) * (Height + 1)` of them.
+- The output is lossless: every value comes through at the precision the replay stores it. Round or quantize on
+  your side if you need it smaller.
 - `Entities` lists every object at game start: trees, mines, hunt, settlements, and each player's starting
   buildings. `PlayerNum` 0 is Mother Nature.
-- `Events` has one entry per command. `Location` is where on the map the command happened, `TargetId` is the
-  entity a task targeted, and `Units` are the entities the player gave the command to.
+- `Events` has one entry per command. `Location` is where on the map the command happened, `Location2` is the
+  second point of two-point god powers like Shifting Sands, `TargetId` is the entity a task targeted, and `Units` are the entities the player gave the command to.
 - World coordinates use X and Z for the map floor and Y for elevation. A map is `Width * TileSize` wide.
 
 Locations are command targets, not unit positions. The replay doesn't record where units walked, how fights went,
-or the score; those come from the game's simulation. A 1v1 is about 50 KB gzipped and a 3v3 about 200 KB.
+or the score; those come from the game's simulation. A 1v1 is about 105 KB gzipped and a 3v3 about 375 KB.
 
 ```bash
 ./restoration-darwin-arm64 playback replay.mythrec.gz --is-gzip | jq '.Map | {Width, Height, Textures}'

@@ -96,6 +96,9 @@ func formatPlaybackEvent(command RawGameCommand, input FormatterInput) PlaybackE
 	if task, ok := command.(TaskCommand); ok && task.targetId >= 0 {
 		event.TargetId = &task.targetId
 	}
+	if power, ok := command.(ProtoPowerCommand); ok && isOnMap(power.location2) {
+		event.Location2 = &power.location2
+	}
 	return event
 }
 
