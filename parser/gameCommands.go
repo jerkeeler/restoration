@@ -81,6 +81,47 @@ func BuildCommandFactory() *CommandFactory {
 	return factory
 }
 
+// commandTypeNames names every registered command type. Format overrides these for commands it formats, e.g.
+// useProtoPower becomes godPower or protoPower.
+var commandTypeNames = map[int]string{
+	0:  "task",
+	1:  "research",
+	2:  "train",
+	3:  "build",
+	4:  "setGatherPoint",
+	7:  "delete",
+	9:  "stop",
+	12: "useProtoPower",
+	13: "marketBuySell",
+	14: "ungarrison",
+	16: "resign",
+	18: "unknown18",
+	19: "tribute",
+	23: "finishUnitTransform",
+	25: "setUnitStance",
+	26: "changeDiplomacy",
+	34: "townBell",
+	35: "autoScoutEvent",
+	37: "changeControlGroup",
+	38: "repair",
+	39: "unknown39",
+	41: "taunt",
+	44: "cheat",
+	45: "cancelQueuedItem",
+	48: "setFormation",
+	53: "startUnitTransform",
+	55: "unknown55",
+	66: "autoqueue",
+	67: "toggleAutoUnitAbility",
+	68: "timeShift",
+	69: "buildWallConnector",
+	71: "seekShelter",
+	72: "prequeueTech",
+	73: "unknown73",
+	75: "prebuyGodPower",
+	78: "unknown78",
+}
+
 // CommandFactoryInstance is a singleton of our CommandFactory as we only need to build up this map once and then
 // use it everywhere
 var CommandFactoryInstance = BuildCommandFactory()
@@ -130,6 +171,8 @@ type RawGameCommand interface {
 	ByteLength() int
 	GameTimeSecs() float64
 	AffectsEAPM() bool
+	SourceUnits() []uint32
+	SourceVectors() []Vector3
 	Format(input FormatterInput) (ReplayGameCommand, bool)
 }
 
@@ -175,6 +218,16 @@ func (cmd BaseCommand) AffectsEAPM() bool {
 	return cmd.affectsEAPM
 }
 
+// SourceUnits are the ids of the units or buildings the player issued the command to.
+func (cmd BaseCommand) SourceUnits() []uint32 {
+	return *cmd.sourceUnits
+}
+
+// SourceVectors hold the clicked world position for commands issued at a point on the map.
+func (cmd BaseCommand) SourceVectors() []Vector3 {
+	return *cmd.sourceVectors
+}
+
 func (cmd BaseCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
 	return ReplayGameCommand{}, false
 }
@@ -194,9 +247,14 @@ func enrichBaseCommand(baseCommand *BaseCommand, byteLength int) {
 
 type TaskCommand struct {
 	BaseCommand
+	targetId       int32
+	targetLocation Vector3
 }
 
 func (cmd TaskCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
+	// Task covers move, gather, attack, garrison, etc. The 3rd int32 is the target entity id (-1 for a ground
+	// click) and the vector is the target's position (-1, -1, -1 for a ground click). Ground clicks carry the
+	// clicked point in the base command's source vectors instead.
 	inputTypes := []func() int{
 		unpackInt32,
 		unpackInt32,
@@ -212,9 +270,12 @@ func (cmd TaskCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCom
 	for _, f := range inputTypes {
 		byteLength += f()
 	}
-	cmd.byteLength = byteLength
 	enrichBaseCommand(baseCommand, byteLength)
-	return TaskCommand{*baseCommand}
+	return TaskCommand{
+		BaseCommand:    *baseCommand,
+		targetId:       readInt32(data, baseCommand.offset+8),
+		targetLocation: readVector(data, baseCommand.offset+16),
+	}
 }
 
 // ========================================================================
@@ -336,6 +397,7 @@ func (cmd BuildCommand) Format(input FormatterInput) (ReplayGameCommand, bool) {
 
 type SetGatherPointCommand struct {
 	BaseCommand
+	location Vector3
 }
 
 func (cmd SetGatherPointCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
@@ -347,7 +409,10 @@ func (cmd SetGatherPointCommand) Refine(baseCommand *BaseCommand, data *[]byte) 
 	enrichBaseCommand(baseCommand, byteLength)
 	// Currently this command triggers a Task subtype move command immediately afterwards, so we don't want to double count
 	baseCommand.affectsEAPM = false
-	return SetGatherPointCommand{*baseCommand}
+	return SetGatherPointCommand{
+		BaseCommand: *baseCommand,
+		location:    readVector(data, baseCommand.offset+8),
+	}
 }
 
 // ========================================================================
@@ -1003,6 +1068,7 @@ func (cmd TimeShiftCommand) Format(input FormatterInput) (ReplayGameCommand, boo
 
 type BuildWallConnectorCommand struct {
 	BaseCommand
+	location Vector3
 }
 
 func (cmd BuildWallConnectorCommand) Refine(baseCommand *BaseCommand, data *[]byte) RawGameCommand {
@@ -1014,7 +1080,11 @@ func (cmd BuildWallConnectorCommand) Refine(baseCommand *BaseCommand, data *[]by
 	enrichBaseCommand(baseCommand, byteLength)
 	// Making a simple wall puts out a LOT of these.
 	baseCommand.affectsEAPM = false
-	return BuildWallConnectorCommand{*baseCommand}
+	// The first vector is the connector's position; the second looks like a facing direction.
+	return BuildWallConnectorCommand{
+		BaseCommand: *baseCommand,
+		location:    readVector(data, baseCommand.offset+12),
+	}
 }
 
 // ========================================================================

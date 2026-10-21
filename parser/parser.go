@@ -14,12 +14,16 @@ func ParseToJson(replayPath string, prettyPrint bool, slim bool, stats bool, isG
 	if err != nil {
 		return "", err
 	}
+	return marshalJson(replayFormat, prettyPrint)
+}
 
+func marshalJson(value any, prettyPrint bool) (string, error) {
 	var jsonBytes []byte
+	var err error
 	if prettyPrint {
-		jsonBytes, err = json.MarshalIndent(replayFormat, "", "    ")
+		jsonBytes, err = json.MarshalIndent(value, "", "    ")
 	} else {
-		jsonBytes, err = json.Marshal(replayFormat)
+		jsonBytes, err = json.Marshal(value)
 	}
 
 	if err != nil {
@@ -37,24 +41,47 @@ func ParseToJson(replayPath string, prettyPrint bool, slim bool, stats bool, isG
 // If we do need to add more optimization, all of the recursive functions could easily spin up a go routine to parse its
 // subtree.
 func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatted, error) {
-	raw_data, err := os.ReadFile(replayPath)
+	replay, err := decodeReplay(replayPath, isGzip)
 	if err != nil {
 		return ReplayFormatted{}, err
+	}
+	return formatRawDataToReplay(
+		slim,
+		stats,
+		&replay.data,
+		&replay.rootNode,
+		&replay.profileKeys,
+		&replay.xmbMap,
+		&replay.commandList,
+	)
+}
+
+// decodedReplay holds every structure decoded from a replay file before formatting.
+type decodedReplay struct {
+	data        []byte // l33t-decompressed header bytes
+	rootNode    Node
+	xmbMap      map[string]XmbFile
+	profileKeys map[string]ProfileKey
+	commandList []RawGameCommand
+}
+
+func decodeReplay(replayPath string, isGzip bool) (decodedReplay, error) {
+	raw_data, err := os.ReadFile(replayPath)
+	if err != nil {
+		return decodedReplay{}, err
 	}
 
 	if isGzip {
 		raw_data, err = DecompressGzip(&raw_data)
-
 		if err != nil {
-			return ReplayFormatted{}, err
+			return decodedReplay{}, err
 		}
 	}
 
 	data, err := Decompressl33t(&raw_data)
 	if err != nil {
-		return ReplayFormatted{}, err
+		return decodedReplay{}, err
 	}
-	// saveHex(&data, "decompressed.hex")
 
 	rootNode := parseHeader(&data)
 
@@ -63,28 +90,13 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 	// around instead.
 	xmbMap, err := parseXmbMap(&data, rootNode)
 	if err != nil {
-		return ReplayFormatted{}, err
+		return decodedReplay{}, err
 	}
-	// for key, _ := range xmbMap {
-	// 	fmt.Println(key)
-	// }
 
 	profileKeys, err := parseProfileKeys(&data, rootNode)
 	if err != nil {
-		return ReplayFormatted{}, err
+		return decodedReplay{}, err
 	}
-	//printProfileKeys(profileKeys)
-	// for key, _ := range xmbMap {
-	// 	fmt.Println("==========================")
-	// 	fmt.Println(key)
-	// }
-	// techtreerootnode, err := parseXmb(&data, xmbMap["protounitcommands"])
-	// if err != nil {
-	// 	return ReplayFormatted{}, err
-	// }
-	// for _, child := range techtreerootnode.children {
-	// 	fmt.Println(child)
-	// }
 
 	commandCount := readUint32(&raw_data, 23)
 	slog.Debug("commandCount", "commandCount", commandCount)
@@ -95,15 +107,10 @@ func Parse(replayPath string, slim bool, stats bool, isGzip bool) (ReplayFormatt
 
 	commandList, err := parseGameCommands(&raw_data, int(commandOffset), int(commandCount))
 	if err != nil {
-		return ReplayFormatted{}, err
+		return decodedReplay{}, err
 	}
 
-	replayFormat, err := formatRawDataToReplay(slim, stats, &data, &rootNode, &profileKeys, &xmbMap, &commandList)
-	if err != nil {
-		return ReplayFormatted{}, err
-	}
-
-	return replayFormat, nil
+	return decodedReplay{data, rootNode, xmbMap, profileKeys, commandList}, nil
 }
 
 func isRootNode(node Node) bool {

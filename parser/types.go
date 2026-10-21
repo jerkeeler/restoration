@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -72,6 +73,17 @@ func (node Node) getChildren(path ...string) []Node {
 		}
 	}
 	return nodes
+}
+
+func (node Node) getSingleChild(path ...string) (Node, error) {
+	children := node.getChildren(path...)
+	if len(children) == 0 {
+		return Node{}, NoChildNodesError(strings.Join(path, "/"))
+	}
+	if len(children) > 1 {
+		return Node{}, MultipleNodesError(strings.Join(path, "/"))
+	}
+	return children[0], nil
 }
 
 func (node Node) String() string {
@@ -215,4 +227,59 @@ type Timelines struct {
 	TechsPrequeued  []TechItem
 	TechsResearched []TechItem
 	GodPowers       []GodPowerItem
+}
+
+// =============================================================================================
+// Playback output: everything a web player needs to redraw the map and replay each command
+// =============================================================================================
+
+type ReplayPlayback struct {
+	ParserVersion  string
+	MapName        string
+	BuildNumber    int
+	GameLengthSecs float64
+	Players        []ReplayPlayer
+	Map            ReplayMap
+	Entities       []ReplayEntity
+	Events         []PlaybackEvent
+}
+
+// ReplayMap is the terrain at game start. Tile grids are base64 with one byte per tile, ordered x-major
+// (index = tileX*Height + tileZ). World position = tile index * TileSize.
+type ReplayMap struct {
+	Width        int
+	Height       int
+	TileSize     float32
+	Textures     []ReplayTexture // Palette for TileTextures, holding only the textures this map uses
+	TileTextures string
+	WaterTypes   []string // Palette for TileWater
+	TileWater    string   // 255 = dry
+	HeightMin    float32
+	HeightMax    float32
+	// Heights has one byte per vertex, (Width+1)*(Height+1) of them, x-major.
+	// Elevation = HeightMin + byte/255 * (HeightMax - HeightMin).
+	Heights string
+}
+
+type ReplayTexture struct {
+	Name  string
+	Group string // PassableLand, Water, Underwater, Shoreline, NonPassableLand, or Ice
+}
+
+type ReplayEntity struct {
+	Id        int32
+	PlayerNum int // 0 = Mother Nature
+	Name      string
+	X         float32
+	Z         float32
+}
+
+type PlaybackEvent struct {
+	GameTimeSecs float64
+	PlayerNum    int
+	CommandType  string
+	Name         string   `json:",omitempty"` // Unit, building, tech, or power the command refers to
+	Location     *Vector3 `json:",omitempty"`
+	TargetId     *int32   `json:",omitempty"` // Entity a task targets, matching ReplayEntity.Id or a unit made later
+	Units        []uint32 `json:",omitempty"` // Entities the command was issued to
 }
