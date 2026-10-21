@@ -36,22 +36,26 @@ var parseCmd = &cobra.Command{
 			os.Exit(1)
 			return
 		}
-		if !quiet {
-			fmt.Println(json)
-		}
-
-		if outputPath != "" && json != "" {
-			slog.Debug("outputPath", "outputPath", outputPath)
-			err = os.WriteFile(outputPath, []byte(json), 0644)
-			if err != nil {
-				fmt.Printf("Error writing to file: %v\n", err)
-				os.Exit(1)
-				return
-			}
-		}
-
+		writeJson(json)
 		slog.Debug("Done parsing!")
 	},
+}
+
+// writeJson prints json to stdout unless --quiet is set, and saves it to --output when given.
+func writeJson(json string) {
+	if !quiet {
+		fmt.Println(json)
+	}
+
+	if outputPath == "" || json == "" {
+		return
+	}
+	slog.Debug("outputPath", "outputPath", outputPath)
+	err := os.WriteFile(outputPath, []byte(json), 0644)
+	if err != nil {
+		fmt.Printf("Error writing to file: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func init() {
@@ -67,17 +71,19 @@ func init() {
 		"Stats mode, add stats to the output, you cannot use this with slim mode",
 	)
 
-	parseCmd.PreRun = func(cmd *cobra.Command, args []string) {
-		if outputPath == "" {
-			return
-		}
-		outputPath = filepath.Clean(outputPath)
-		absPath, err := filepath.Abs(outputPath)
-		if err != nil {
-			return
-		}
-		outputPath = absPath
+	parseCmd.PreRun = resolveOutputPath
+}
+
+func resolveOutputPath(cmd *cobra.Command, args []string) {
+	if outputPath == "" {
+		return
 	}
+	outputPath = filepath.Clean(outputPath)
+	absPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		return
+	}
+	outputPath = absPath
 }
 
 type InvalidPath string

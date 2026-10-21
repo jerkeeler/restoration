@@ -24,14 +24,16 @@ The CLI is intentionally thin — `cmd/parse.go` validates the path and calls `p
 
 ## Subcommands
 
-| Command   | What it does                                                |
-| --------- | ----------------------------------------------------------- |
-| `parse`   | Parse a single replay file → JSON to stdout or `-o` path    |
-| `rename`  | Walk a directory and rename replays based on parsed players |
-| `version` | Print parser version (sourced from `parser.VERSION`)        |
+| Command    | What it does                                                              |
+| ---------- | ------------------------------------------------------------------------- |
+| `parse`    | Parse a single replay file → JSON to stdout or `-o` path                  |
+| `playback` | Map snapshot at game start + every command's location, for web playback   |
+| `rename`   | Walk a directory and rename replays based on parsed players               |
+| `version`  | Print parser version (sourced from `parser.VERSION`)                      |
 
 Global flags: `--is-gzip` (file is gzipped), `-v/--verbose` (debug logging).
 `parse` flags: `-o/--output`, `-q/--quiet`, `--pretty-print`, `--slim` (drop game commands), `--stats` (per-player aggregates; mutually exclusive with `--slim`).
+`playback` flags: `-o/--output`, `-q/--quiet`, `--pretty-print`. Same stdout-is-JSON contract as `parse`.
 
 The contract for `parse`: **stdout is pure JSON.** All logging goes through `log/slog` to stderr so `restoration parse … | jq …` always works. Don't break this — no `fmt.Println` for diagnostics.
 
@@ -45,7 +47,7 @@ go fmt ./...                              # required before commits
 go vet ./...                              # recommended sanity check
 ```
 
-There is no test suite yet (see "Known unknowns"). The release workflow (`.github/workflows/release.yaml`) runs on `v*` tag pushes, builds for linux-amd64 / darwin-amd64 / darwin-arm64 / windows-amd64, and attaches binaries to a GitHub Release.
+`go test ./...` runs unit tests for the playback decoders over synthetic bytes. Set `RESTORATION_TEST_REPLAYS` to a directory of current-build replays to also run `TestParsePlaybackOnReplays`. The rest of the parser has no tests yet (see "Known unknowns"). The release workflow (`.github/workflows/release.yaml`) runs on `v*` tag pushes, builds for linux-amd64 / darwin-amd64 / darwin-arm64 / windows-amd64, and attaches binaries to a GitHub Release.
 
 When bumping the parser version, update `parser/consts.go` (`VERSION`) and tag the commit `vX.Y.Z` to trigger the release.
 
@@ -71,7 +73,7 @@ The replay format is reverse-engineered. Several things are explicitly unfinishe
 - **Not all game commands are decoded.** Commands 18, 39, 55, 73, 78 are recognized (their byte length is known well enough to advance the cursor) but their payloads are not extracted. Many other command IDs may exist in the wild and will cause the parser to **fail hard** — see `parser/gameCommandParser.go` where an unregistered command type returns an error with no fallback.
 - **Discovering a new command is empirical.** The workflow is: launch the game, perform the action you want to identify, save the replay, diff it against a baseline replay, and locate the new bytes. Hardcoded byte offsets and length heuristics in `parser/gameCommands.go` are the result of this process. Patches to the game can shift these.
 - **Team game support is partial.** Winner detection assumes 1v1 (`Winner = !losingTeam`). FFA and team games are not fully validated.
-- **No automated tests.** No fixture replays are checked in. Verify changes by parsing real replay files locally and inspecting the JSON diff.
+- **Few automated tests.** Only the playback decoders (`terrain.go`, `entities.go`, `playback.go`) have unit tests. No fixture replays are checked in. Verify other changes by parsing real replay files locally and inspecting the JSON diff.
 - **Some header/XMB structure is still mysterious.** See TODOs in `parser/header.go` (e.g. the `kL` node) and `parser/gameCommands.go` (cheat name lookup, command 78 length heuristic).
 
 When AoM ships a patch, the parser may break. Recent commit history is dominated by post-patch fixes (commands 73/78, AI player parsing, node misrecognition). Treat the parser as a living artifact that tracks the live game.
@@ -105,12 +107,13 @@ The user-facing version of this policy lives in `README.md` ("Patch compatibilit
 
 ## Verifying a change
 
-There is no `go test ./...` to lean on. After touching `parser/`:
+`go test ./...` covers the playback decoders only. After touching `parser/`:
 
-1. Parse a known-good replay with `--pretty-print` and compare the JSON to a saved baseline.
-2. If the change touches game commands, parse with `--stats` too and sanity-check counts (units trained, techs researched, EAPM) against expectations from the actual game.
-3. If a player has reported a broken replay, parse that file specifically and confirm it now succeeds.
-4. `go vet ./...` and `go fmt ./...` before committing.
+1. Run `go test ./...`, with `RESTORATION_TEST_REPLAYS` pointing at current-build replays if you touched playback.
+2. Parse a known-good replay with `--pretty-print` and compare the JSON to a saved baseline.
+3. If the change touches game commands, parse with `--stats` too and sanity-check counts (units trained, techs researched, EAPM) against expectations from the actual game.
+4. If a player has reported a broken replay, parse that file specifically and confirm it now succeeds.
+5. `go vet ./...` and `go fmt ./...` before committing.
 
 ## Debugging a new-patch parsing failure
 

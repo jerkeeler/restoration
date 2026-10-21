@@ -40,9 +40,9 @@ func readBool(data *[]byte, offset int) bool {
 
 func readVector(data *[]byte, offset int) Vector3 {
 	return Vector3{
-		X: readInt32(data, offset),
-		Y: readInt32(data, offset+4),
-		Z: readInt32(data, offset+8),
+		X: readFloat(data, offset),
+		Y: readFloat(data, offset+4),
+		Z: readFloat(data, offset+8),
 	}
 }
 

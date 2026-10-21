@@ -43,6 +43,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
   parse       Parses .mythrec files to human-readable json
+  playback    Extracts the map and located commands from a .mythrec for match playback
   rename      Renames all .mythrec (or .mythrec.gz) in a directory based on player names
 
 Flags:
@@ -98,6 +99,48 @@ Global Flags:
       --is-gzip   Indicates whether the input files are compressed with gzip
   -v, --verbose   Enable verbose logging
 
+```
+
+The playback command help:
+
+```
+❯ ./restoration-darwin-arm64 playback --help
+Extracts what a web player needs to redraw a match as json: the terrain, heightmap, and every
+object on the map at game start, plus every command with its game time, player, and map location.
+
+Usage:
+  restoration playback [flags]
+
+Flags:
+  -h, --help            help for playback
+  -o, --output string   Save the output JSON to the provided filepath
+      --pretty-print    Pretty print the output JSON
+  -q, --quiet           Quiet mode, no output to standard output
+```
+
+### Playback output
+
+`playback` reads the snapshot of the map that the game stores at the start of every replay, then pairs it
+with the command log. The output has four parts besides the match metadata and players:
+
+- `Map` holds the tile grids and heightmap. Each grid is base64 with one byte per tile, ordered x-major
+  (`index = tileX * Height + tileZ`). `TileTextures` indexes into `Textures`, which lists each texture name and
+  its group (`PassableLand`, `Shoreline`, `NonPassableLand`, and so on). `TileWater` indexes into `WaterTypes`,
+  with 255 for dry tiles. `Heights` is base64 of little-endian float32 elevations, one per tile corner,
+  `(Width + 1) * (Height + 1)` of them.
+- The output is lossless: every value comes through at the precision the replay stores it. Round or quantize on
+  your side if you need it smaller.
+- `Entities` lists every object at game start: trees, mines, hunt, settlements, and each player's starting
+  buildings. `PlayerNum` 0 is Mother Nature.
+- `Events` has one entry per command. `Location` is where on the map the command happened, `Location2` is the
+  second point of two-point god powers like Shifting Sands, `TargetId` is the entity a task targeted, and `Units` are the entities the player gave the command to.
+- World coordinates use X and Z for the map floor and Y for elevation. A map is `Width * TileSize` wide.
+
+Locations are command targets, not unit positions. The replay doesn't record where units walked, how fights went,
+or the score; those come from the game's simulation. A 1v1 is about 105 KB gzipped and a 3v3 about 375 KB.
+
+```bash
+./restoration-darwin-arm64 playback replay.mythrec.gz --is-gzip | jq '.Map | {Width, Height, Textures}'
 ```
 
 ### Example Output
@@ -225,7 +268,7 @@ Game commands will be a long list that looks like the following when not in slim
 
 ## Limitations
 
-1. There is no automated testing, currently, and there may be many bugs.
+1. Automated tests cover the playback decoders. The rest of the parser still relies on comparing output across real replays, and there may be many bugs.
 2. Currently this tool only supports 1v1 games, team games are in the workds.
 3. This only works for multiplayer games and has only been tested on ranked game replays.
 4. Not all command types are currently paresd and stored in the output JSON, if you have a request for a specific command type please open an issue.
@@ -256,6 +299,7 @@ to add coverage for whatever the patch changed.
 - [ ] Add refiners for all command types
 - [ ] Add stats calculation
 - [ ] Add testing
+  - Started with the playback decoders, see `go test ./...`
 
 ## Development, contribution guidelines
 
@@ -265,6 +309,7 @@ to add coverage for whatever the patch changed.
 - If you are adding a new command, ensure that sufficient documentation is added
 - A general rule of thumb is that a `parse*` function is working on the underlying byte slice and everything else is using data that has been marshalled into a coherent data structure
 - Anyone is open to contributing to this repo, just open a PR and I will review it
+- Run `go test ./...` before opening a PR. Set `RESTORATION_TEST_REPLAYS` to a directory of current-build replays to also run the playback checks against real files
 - Always use `slog` and never use `fmt.Println`
   - Be liberal with `slog.Debug`
 - Keep the output from the `parse` command clean, it should only be JSON. Ideally one can then take the standard output and pipe it into a file or any other tool (such as `jq`).
